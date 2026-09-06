@@ -1,0 +1,8 @@
+{
+  "name": "GeoExplorer: Wings of Knowledge",
+  "description": "A 3D educational flight game where kids explore countries, learn geography directions, and discover famous landmarks using Google Maps data and a conversational AI co-pilot.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}
