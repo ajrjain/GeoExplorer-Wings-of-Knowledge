@@ -10,6 +10,8 @@ interface UIOverlayProps {
     onStartGame: (region: string, weather: import('../types').Weather) => void;
     onToggleCopilot: () => void;
     onReset: () => void;
+    onStartApp: () => void;
+    onShowWaitlist: () => void;
     onCloseFact: () => void;
     onPause: () => void;
     onResume: () => void;
@@ -31,6 +33,9 @@ const REGIONS = [
     { name: 'USA', emoji: '🇺🇸' },
     { name: 'Canada', emoji: '🇨🇦' },
     { name: 'Australia', emoji: '🇦🇺' },
+    { name: 'Dubai', emoji: '🇦🇪' },
+    { name: 'Singapore', emoji: '🇸🇬' },
+    { name: 'UK', emoji: '🇬🇧' },
     { name: 'Pacific Ocean', emoji: '🌊' },
     { name: 'Atlantic Ocean', emoji: '🌊' },
     { name: 'Indian Ocean', emoji: '🌊' },
@@ -111,6 +116,8 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
     onStartGame,
     onToggleCopilot,
     onReset,
+    onStartApp,
+    onShowWaitlist,
     onCloseFact,
     onPause,
     onResume,
@@ -129,21 +136,88 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
         }
     };
 
-    if (gameState.screen === 'start') {
+    if (gameState.screen === 'home') {
         return (
             <div className="absolute inset-0 bg-slate-900 bg-opacity-95 flex flex-col items-center justify-center p-4 z-50">
-                <div className="max-w-4xl w-full text-center">
-                    <h1 className="text-6xl font-bold text-sky-400 mb-2 drop-shadow-lg tracking-wider">GEO EXPLORER</h1>
-                    <p className="text-2xl text-slate-300 mb-8">Wings of Knowledge</p>
+                <div className="max-w-2xl w-full text-center">
+                    <h1 className="text-6xl md:text-8xl font-bold text-sky-400 mb-4 drop-shadow-[0_0_20px_rgba(56,189,248,0.5)] tracking-wider">GEO EXPLORER</h1>
+                    <p className="text-2xl md:text-4xl text-slate-300 mb-4">Wings of Knowledge</p>
+                    <p className="text-lg md:text-xl text-sky-200/80 mb-12 italic">Built by Krishvi Jain</p>
                     
-                    <div className="mb-8">
-                        <h2 className="text-xl text-white mb-4">Select Weather:</h2>
-                        <div className="flex justify-center gap-4">
+                    <div className="flex flex-col sm:flex-row gap-6 justify-center">
+                        <button 
+                            onClick={() => onStartApp()} 
+                            className="bg-sky-500 hover:bg-sky-400 text-white font-bold py-4 px-8 rounded-full text-2xl transition-all shadow-[0_0_30px_rgba(56,189,248,0.4)] hover:shadow-[0_0_50px_rgba(56,189,248,0.6)] hover:scale-105"
+                        >
+                            Play Demo
+                        </button>
+                        <button 
+                            onClick={() => onShowWaitlist()}
+                            className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 px-8 rounded-full text-2xl border-2 border-slate-600 transition-all hover:border-slate-500"
+                        >
+                            Join Waitlist
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (gameState.screen === 'waitlist') {
+        return (
+            <div className="absolute inset-0 bg-slate-900 bg-opacity-95 flex flex-col items-center justify-center p-4 z-50">
+                <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md w-full shadow-2xl">
+                    <h2 className="text-3xl font-bold text-sky-400 mb-2">Join Waitlist</h2>
+                    <p className="text-slate-300 mb-6">You've reached the maximum flights for this session, or want full access! Enter your details below.</p>
+                    <form 
+                        onSubmit={async (e) => {
+                            e.preventDefault();
+                            const form = e.target as HTMLFormElement;
+                            const name = (form.elements.namedItem('name') as HTMLInputElement).value;
+                            const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+                            try {
+                                await fetch('/api/waitlist', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ name, email })
+                                });
+                                alert('Thanks for joining!');
+                                onReset();
+                            } catch(err) {
+                                alert('Error saving waitlist');
+                            }
+                        }}
+                        className="flex flex-col gap-4"
+                    >
+                        <input name="name" type="text" placeholder="Your Name" required className="p-3 rounded-lg bg-slate-900 border border-slate-700 text-white w-full" />
+                        <input name="email" type="email" placeholder="Your Email" required className="p-3 rounded-lg bg-slate-900 border border-slate-700 text-white w-full" />
+                        <button type="submit" className="bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 rounded-full text-xl transition-colors mt-2">
+                            Submit Request
+                        </button>
+                        <button type="button" onClick={() => onReset()} className="text-slate-400 hover:text-white mt-2">
+                            Back to Home
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
+
+    if (gameState.screen === 'start') {
+        return (
+            <div className="absolute inset-0 bg-slate-900 bg-opacity-95 flex flex-col items-center justify-center p-4 z-50 overflow-hidden">
+                <div className="max-w-4xl w-full text-center h-full max-h-screen flex flex-col py-8">
+                    <h1 className="text-4xl sm:text-6xl font-bold text-sky-400 mb-2 drop-shadow-lg tracking-wider shrink-0">GEO EXPLORER</h1>
+                    <p className="text-xl sm:text-2xl text-slate-300 mb-4 shrink-0">Wings of Knowledge</p>
+                    
+                    <div className="mb-4 shrink-0">
+                        <h2 className="text-lg sm:text-xl text-white mb-2">Select Weather:</h2>
+                        <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
                             {['sunny', 'rainy', 'snowy'].map((w) => (
                                 <button
                                     key={w}
                                     onClick={() => setSelectedWeather(w as any)}
-                                    className={`px-6 py-2 rounded-full font-bold capitalize transition-all border-2 ${
+                                    className={`px-4 sm:px-6 py-2 rounded-full font-bold capitalize transition-all border-2 text-sm sm:text-base ${
                                         selectedWeather === w 
                                         ? 'bg-sky-500 border-sky-400 text-white shadow-[0_0_15px_rgba(56,189,248,0.5)]' 
                                         : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-sky-400'
@@ -155,18 +229,20 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                         </div>
                     </div>
 
-                    <h2 className="text-3xl text-white mb-8">Select a Destination:</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {REGIONS.map((r) => (
-                            <button
-                                key={r.name}
-                                onClick={() => onStartGame(r.name, selectedWeather)}
-                                className="bg-slate-800 hover:bg-sky-600 transition-all duration-300 p-6 rounded-xl border-2 border-slate-700 hover:border-sky-400 group"
-                            >
-                                <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">{r.emoji}</div>
-                                <div className="text-xl font-bold text-white">{r.name}</div>
-                            </button>
-                        ))}
+                    <h2 className="text-2xl sm:text-3xl text-white mb-4 shrink-0">Select a Destination:</h2>
+                    <div className="overflow-y-auto pr-2 pb-12 flex-1 scrollbar-thin scrollbar-thumb-sky-500 scrollbar-track-slate-800">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-4">
+                            {REGIONS.map((r) => (
+                                <button
+                                    key={r.name}
+                                    onClick={() => onStartGame(r.name, selectedWeather)}
+                                    className="bg-slate-800 hover:bg-sky-600 transition-all duration-300 p-4 sm:p-6 rounded-xl border-2 border-slate-700 hover:border-sky-400 group flex flex-col items-center justify-center min-h-[120px]"
+                                >
+                                    <div className="text-4xl sm:text-6xl mb-2 sm:mb-4 group-hover:scale-110 transition-transform">{r.emoji}</div>
+                                    <div className="text-sm sm:text-xl font-bold text-white text-center break-words w-full">{r.name}</div>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>

@@ -4,22 +4,33 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
     "preview": "vite preview"
   },
   "dependencies": {
-    "lucide-react": "^0.556.0",
-    "three": "^0.181.2",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
     "@google/genai": "^1.31.0",
     "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.4.2"
+    "@react-three/fiber": "^9.4.2",
+    "@types/http-proxy-middleware": "^0.19.3",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "http-proxy-middleware": "^4.2.0",
+    "lucide-react": "^0.556.0",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "three": "^0.181.2",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.14.0",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.0.0",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.13",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

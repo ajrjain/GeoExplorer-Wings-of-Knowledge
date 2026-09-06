@@ -25,6 +25,9 @@ const REGION_COORDS: Record<string, {lat: number, lon: number}> = {
     'USA': { lat: 37.0, lon: -95.7 },
     'Canada': { lat: 56.1, lon: -106.3 },
     'Australia': { lat: -25.2, lon: 133.7 },
+    'Dubai': { lat: 25.2, lon: 55.3 },
+    'Singapore': { lat: 1.3, lon: 103.8 },
+    'UK': { lat: 55.3, lon: -3.4 },
     'Pacific Ocean': { lat: 0, lon: 160 },
     'Atlantic Ocean': { lat: 14.5, lon: -38.5 },
     'Indian Ocean': { lat: -20.0, lon: 80.0 },
@@ -32,7 +35,7 @@ const REGION_COORDS: Record<string, {lat: number, lon: number}> = {
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>({
-    screen: 'start',
+    screen: 'home' as any, // We will extend the type later, using any for quick add
     selectedRegion: '',
     score: 0,
     landmarks: [],
@@ -48,6 +51,7 @@ export default function App() {
   const [introText, setIntroText] = useState('');
   const [isIntroComplete, setIsIntroComplete] = useState(false);
   const [dataReady, setDataReady] = useState(false);
+  const [playCount, setPlayCount] = useState(0);
 
   const liveClientRef = useRef<GeminiLiveClient | null>(null);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -63,9 +67,7 @@ export default function App() {
   const planePosRef = useRef({ x: 0, z: 0, rot: 0 });
 
   useEffect(() => {
-    if (process.env.API_KEY) {
-        liveClientRef.current = new GeminiLiveClient(process.env.API_KEY);
-    }
+    liveClientRef.current = new GeminiLiveClient();
     return () => {
         liveClientRef.current?.disconnect();
         window.speechSynthesis.cancel();
@@ -103,6 +105,12 @@ export default function App() {
   }, [currentFact]);
 
   const handleStartGame = async (region: string, selectedWeather: Weather) => {
+    if (playCount >= 3) {
+        setGameState(prev => ({ ...prev, screen: 'waitlist' as any }));
+        return;
+    }
+    setPlayCount(prev => prev + 1);
+
     // 1. Reset State & Start Intro
     setGameState(prev => ({ ...prev, screen: 'intro', selectedRegion: region }));
     setIntroText('');
@@ -236,16 +244,25 @@ export default function App() {
 
   const handleReset = () => {
       setGameState({
-          screen: 'start',
+          screen: 'home' as any,
           selectedRegion: '',
           score: 0,
           landmarks: [],
-          totalLandmarks: 0
+          totalLandmarks: 0,
+          isPaused: false
       });
       setCurrentFact(null);
       setCopilotConnected(false);
       liveClientRef.current?.disconnect();
       window.speechSynthesis.cancel();
+  };
+
+  const handleStartApp = () => {
+      setGameState(prev => ({ ...prev, screen: 'start' }));
+  };
+
+  const handleShowWaitlist = () => {
+      setGameState(prev => ({ ...prev, screen: 'waitlist' as any }));
   };
 
   const handleUpdateStats = useCallback((direction: Direction, speed: number) => {
@@ -306,6 +323,8 @@ export default function App() {
         onStartGame={handleStartGame}
         onToggleCopilot={handleToggleCopilot}
         onReset={handleReset}
+        onStartApp={handleStartApp}
+        onShowWaitlist={handleShowWaitlist}
         onCloseFact={handleCloseFact}
         onPause={handlePause}
         onResume={handleResume}

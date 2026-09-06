@@ -17,10 +17,11 @@ export const fetchLandmarksForRegion = async (region: string): Promise<RegionDat
       return preloaded;
   }
 
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key missing");
-
-  const ai = new GoogleGenAI({ apiKey });
+  // We are going to pass a dummy api key to satisfy the sdk, but our proxy handles the real key
+  const ai = new GoogleGenAI({ 
+      apiKey: 'dummy',
+      httpOptions: { baseUrl: window.location.origin + '/api/gemini' }
+  });
 
   
   try {
@@ -85,8 +86,11 @@ export class GeminiLiveClient {
   private nextStartTime: number = 0;
   private activeSources: Set<AudioBufferSourceNode> = new Set();
   
-  constructor(apiKey: string) {
-    this.client = new GoogleGenAI({ apiKey });
+  constructor() {
+    this.client = new GoogleGenAI({ 
+        apiKey: 'dummy',
+        httpOptions: { baseUrl: window.location.origin + '/api/gemini' }
+    });
     this.outputContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
   }
 
@@ -103,6 +107,7 @@ export class GeminiLiveClient {
       config: {
         responseModalities: [Modality.AUDIO],
         systemInstruction: `You are 'Captain Echo', a cheerful and helpful co-pilot for a child flying a plane in a game. 
+        You support Hinglish (a mix of Hindi and English) fluently.
         Keep your responses short, encouraging, and fun. 
         Help them with directions (North, South, East, West). 
         When they find a treasure, celebrate with them!

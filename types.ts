@@ -8,7 +8,7 @@ export interface Landmark {
 }
 
 export interface GameState {
-  screen: 'start' | 'intro' | 'loading' | 'playing' | 'summary';
+  screen: 'home' | 'start' | 'intro' | 'loading' | 'playing' | 'summary' | 'waitlist';
   selectedRegion: string;
   score: number;
   landmarks: Landmark[];
