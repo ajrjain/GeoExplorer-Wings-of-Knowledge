@@ -7,7 +7,7 @@ interface UIOverlayProps {
     currentDirection: Direction;
     copilotConnected: boolean;
     lastTranscription: string;
-    onStartGame: (region: string, weather: import('../types').Weather) => void;
+    onStartGame: (region: string, weather: import('../types').Weather, planeType: import('../types').PlaneType) => void;
     onToggleCopilot: () => void;
     onReset: () => void;
     onStartApp: () => void;
@@ -128,6 +128,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
 }) => {
 
     const [selectedWeather, setSelectedWeather] = React.useState<import('../types').Weather>('sunny');
+    const [selectedPlaneUI, setSelectedPlaneUI] = React.useState<import('../types').PlaneType>('propeller');
 
     // Handlers for touch controls
     const setControl = (key: keyof ControlState, active: boolean) => {
@@ -210,22 +211,43 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                     <h1 className="text-4xl sm:text-6xl font-bold text-sky-400 mb-2 drop-shadow-lg tracking-wider shrink-0">GEO EXPLORER</h1>
                     <p className="text-xl sm:text-2xl text-slate-300 mb-4 shrink-0">Wings of Knowledge</p>
                     
-                    <div className="mb-4 shrink-0">
-                        <h2 className="text-lg sm:text-xl text-white mb-2">Select Weather:</h2>
-                        <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
-                            {['sunny', 'rainy', 'snowy'].map((w) => (
-                                <button
-                                    key={w}
-                                    onClick={() => setSelectedWeather(w as any)}
-                                    className={`px-4 sm:px-6 py-2 rounded-full font-bold capitalize transition-all border-2 text-sm sm:text-base ${
-                                        selectedWeather === w 
-                                        ? 'bg-sky-500 border-sky-400 text-white shadow-[0_0_15px_rgba(56,189,248,0.5)]' 
-                                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-sky-400'
-                                    }`}
-                                >
-                                    {w === 'sunny' ? '☀️ ' : (w === 'rainy' ? '🌧️ ' : '❄️ ')} {w}
-                                </button>
-                            ))}
+                    <div className="mb-4 shrink-0 flex flex-col md:flex-row justify-center items-center gap-8">
+                        <div>
+                            <h2 className="text-lg sm:text-xl text-white mb-2">Select Weather:</h2>
+                            <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
+                                {['sunny', 'rainy', 'snowy'].map((w) => (
+                                    <button
+                                        key={w}
+                                        onClick={() => setSelectedWeather(w as any)}
+                                        className={`px-4 sm:px-6 py-2 rounded-full font-bold capitalize transition-all border-2 text-sm sm:text-base ${
+                                            selectedWeather === w 
+                                            ? 'bg-sky-500 border-sky-400 text-white shadow-[0_0_15px_rgba(56,189,248,0.5)]' 
+                                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-sky-400'
+                                        }`}
+                                    >
+                                        {w === 'sunny' ? '☀️ ' : (w === 'rainy' ? '🌧️ ' : '❄️ ')} {w}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h2 className="text-lg sm:text-xl text-white mb-2">Select Plane:</h2>
+                            <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
+                                {['propeller', 'jet', 'glider'].map((p) => (
+                                    <button
+                                        key={p}
+                                        onClick={() => setSelectedPlaneUI(p as any)}
+                                        className={`px-4 sm:px-6 py-2 rounded-full font-bold capitalize transition-all border-2 text-sm sm:text-base flex items-center gap-2 ${
+                                            selectedPlaneUI === p 
+                                            ? 'bg-emerald-500 border-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)]' 
+                                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-400'
+                                        }`}
+                                    >
+                                        {p === 'propeller' ? '🛩️' : (p === 'jet' ? '🚀' : '🪁')} {p}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
@@ -235,7 +257,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                             {REGIONS.map((r) => (
                                 <button
                                     key={r.name}
-                                    onClick={() => onStartGame(r.name, selectedWeather)}
+                                    onClick={() => onStartGame(r.name, selectedWeather, selectedPlaneUI)}
                                     className="bg-slate-800 hover:bg-sky-600 transition-all duration-300 p-4 sm:p-6 rounded-xl border-2 border-slate-700 hover:border-sky-400 group flex flex-col items-center justify-center min-h-[120px]"
                                 >
                                     <div className="text-4xl sm:text-6xl mb-2 sm:mb-4 group-hover:scale-110 transition-transform">{r.emoji}</div>
@@ -296,7 +318,13 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                     <div className="w-px bg-slate-600"></div>
                     <div className="flex items-center gap-2">
                         <Trophy className="text-yellow-400" />
-                        <span className="font-bold text-xl">{gameState.score} / {gameState.totalLandmarks}</span>
+                        <span className="font-bold text-xl">{gameState.score} Pts</span>
+                    </div>
+                    <div className="w-px bg-slate-600"></div>
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold text-lg text-slate-300">
+                            {gameState.landmarks.filter(l => l.collected).length} / {gameState.totalLandmarks} Found
+                        </span>
                     </div>
                     <div className="w-px bg-slate-600"></div>
                     <button 
@@ -333,37 +361,26 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
 
             {/* Bottom Right - Fact Panel */}
             {currentFact && (
-                <div className="absolute bottom-6 right-6 pointer-events-auto z-50 flex animate-in slide-in-from-right duration-500 drop-shadow-2xl max-w-sm w-full md:max-w-md">
-                    <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 w-full shadow-2xl border-l-8 border-sky-500 flex flex-col">
-                        <div className="flex justify-between items-start mb-3">
-                            <h3 className="text-2xl font-bold text-slate-800 leading-tight">{currentFact.name}</h3>
-                            <button onClick={onCloseFact} className="text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full w-8 h-8 flex items-center justify-center transition-colors ml-4 shrink-0">
-                                <span className="text-xl font-bold leading-none">×</span>
+                <div className="absolute bottom-6 right-6 pointer-events-auto z-50 flex animate-in slide-in-from-right duration-500 drop-shadow-2xl max-w-xs w-full">
+                    <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 w-full shadow-2xl border-l-8 border-sky-500 flex flex-col">
+                        <div className="flex justify-between items-start mb-2">
+                            <h3 className="text-xl font-bold text-slate-800 leading-tight">{currentFact.name}</h3>
+                            <button onClick={onCloseFact} className="text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full w-6 h-6 flex items-center justify-center transition-colors ml-4 shrink-0">
+                                <span className="text-lg font-bold leading-none">×</span>
                             </button>
                         </div>
-                        
-                        {/* Realistic Image of the Landmark */}
-                        <div className="w-full h-48 bg-slate-200 rounded-xl mb-4 overflow-hidden relative shadow-inner">
-                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">Loading image...</div>
-                            <img 
-                                src={`https://image.pollinations.ai/prompt/realistic_photograph_of_${encodeURIComponent(currentFact.name)}_in_${encodeURIComponent(gameState.selectedRegion)}_high_quality_monument_scenery?width=600&height=400&nologo=true&seed=999`} 
-                                alt={currentFact.name}
-                                className="w-full h-full object-cover relative z-10"
-                                loading="lazy"
-                            />
-                        </div>
 
-                        <div className="bg-sky-50 p-4 rounded-xl mb-4 border border-sky-100">
-                             <p className="text-base text-slate-700 leading-relaxed font-medium">
+                        <div className="bg-sky-50 p-3 rounded-xl mb-3 border border-sky-100">
+                             <p className="text-sm text-slate-700 leading-relaxed font-medium">
                                 "{currentFact.fact}"
                             </p>
                         </div>
-                        <p className="text-slate-500 text-sm italic mb-4 line-clamp-2">{currentFact.description}</p>
+                        <p className="text-slate-500 text-xs italic mb-3 line-clamp-2">{currentFact.description}</p>
                         <button 
                             onClick={onCloseFact}
-                            className="w-full bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 rounded-xl transition-colors text-lg shadow-md"
+                            className="w-full bg-sky-500 hover:bg-sky-400 text-white font-bold py-2 rounded-xl transition-colors text-sm shadow-md"
                         >
-                            Awesome!
+                            Awesome! (+100 Pts)
                         </button>
                     </div>
                 </div>

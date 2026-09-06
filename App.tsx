@@ -37,6 +37,7 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState>({
     screen: 'home' as any, // We will extend the type later, using any for quick add
     selectedRegion: '',
+    selectedPlane: 'propeller',
     score: 0,
     landmarks: [],
     totalLandmarks: 0,
@@ -104,7 +105,7 @@ export default function App() {
       };
   }, [currentFact]);
 
-  const handleStartGame = async (region: string, selectedWeather: Weather) => {
+  const handleStartGame = async (region: string, selectedWeather: Weather, selectedPlane: import('./types').PlaneType) => {
     if (playCount >= 3) {
         setGameState(prev => ({ ...prev, screen: 'waitlist' as any }));
         return;
@@ -112,7 +113,7 @@ export default function App() {
     setPlayCount(prev => prev + 1);
 
     // 1. Reset State & Start Intro
-    setGameState(prev => ({ ...prev, screen: 'intro', selectedRegion: region }));
+    setGameState(prev => ({ ...prev, screen: 'intro', selectedRegion: region, selectedPlane }));
     setIntroText('');
     setIsIntroComplete(false);
     setDataReady(false);
@@ -215,14 +216,16 @@ export default function App() {
         const newLandmarks = [...prev.landmarks];
         newLandmarks[lmIndex] = { ...newLandmarks[lmIndex], collected: true };
         
-        const newScore = prev.score + 1;
-        const won = newScore === prev.totalLandmarks;
+        // Count collected landmarks for win condition instead of using raw score
+        const collectedCount = newLandmarks.filter(l => l.collected).length;
+        const newScore = prev.score + 100;
+        const won = collectedCount === prev.totalLandmarks;
 
         setCurrentFact(newLandmarks[lmIndex]);
 
         if (won) {
             setTimeout(() => {
-                setGameState(gs => ({ ...gs, screen: 'summary' }));
+                setGameState(gs => ({ ...gs, screen: 'summary', score: gs.score + 500 })); // Add completion bonus
                 setCurrentFact(null);
             }, 6000); 
         }
@@ -237,8 +240,9 @@ export default function App() {
 
   const handleCloseFact = () => {
       setCurrentFact(null);
-      if (gameState.score === gameState.totalLandmarks) {
-          setGameState(prev => ({ ...prev, screen: 'summary' }));
+      const collectedCount = gameState.landmarks.filter(l => l.collected).length;
+      if (collectedCount === gameState.totalLandmarks) {
+          setGameState(prev => ({ ...prev, screen: 'summary', score: prev.score + 500 }));
       }
   };
 
@@ -246,6 +250,7 @@ export default function App() {
       setGameState({
           screen: 'home' as any,
           selectedRegion: '',
+          selectedPlane: 'propeller',
           score: 0,
           landmarks: [],
           totalLandmarks: 0,
@@ -307,6 +312,7 @@ export default function App() {
                 onUpdateStats={handleUpdateStats}
                 region={gameState.selectedRegion}
                 weather={currentWeather}
+                planeType={gameState.selectedPlane}
                 controlsRef={controlsRef}
                 planePosRef={planePosRef}
                 isPaused={gameState.isPaused || gameState.screen !== 'playing'}

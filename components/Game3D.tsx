@@ -9,50 +9,71 @@ const PLANE_SPEED = 0.5;
 const MAP_SIZE = 800;
 
 // --- Plane Component ---
-const Plane = ({ position, rotation }: { position: THREE.Vector3; rotation: THREE.Euler }) => {
+const Plane = ({ position, rotation, type }: { position: THREE.Vector3; rotation: THREE.Euler, type: import('../types').PlaneType }) => {
+  const isJet = type === 'jet';
+  const isGlider = type === 'glider';
+  const mainColor = isJet ? '#10b981' : (isGlider ? '#f43f5e' : '#fbbf24');
+  const wingColor = isJet ? '#334155' : (isGlider ? '#e2e8f0' : '#ef4444');
+
   return (
     <group position={position} rotation={rotation}>
       <group rotation={[0, Math.PI, 0]}> 
           {/* Fuselage */}
           <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.5, 0.2, 4]} />
-            <meshStandardMaterial color="#fbbf24" metalness={0.6} roughness={0.2} />
+            {isGlider ? (
+                <cylinderGeometry args={[0.2, 0.1, 5]} />
+            ) : isJet ? (
+                <cylinderGeometry args={[0.6, 0.4, 5]} />
+            ) : (
+                <cylinderGeometry args={[0.5, 0.2, 4]} />
+            )}
+            <meshStandardMaterial color={mainColor} metalness={isJet ? 0.9 : 0.6} roughness={isJet ? 0.1 : 0.2} />
           </mesh>
           {/* Cockpit */}
-          <mesh position={[0, 0.8, -0.5]}>
-            <boxGeometry args={[0.6, 0.6, 1.2]} />
+          <mesh position={[0, isGlider ? 0.3 : 0.8, -0.5]}>
+            <boxGeometry args={isJet ? [0.8, 0.4, 1.5] : [0.6, 0.6, 1.2]} />
             <meshStandardMaterial color="#38bdf8" transparent opacity={0.6} metalness={0.9} roughness={0} />
           </mesh>
           {/* Wings */}
-          <mesh position={[0, 0.2, -0.5]}>
-            <boxGeometry args={[6, 0.1, 1.5]} />
-            <meshStandardMaterial color="#ef4444" />
+          <mesh position={[0, 0.2, isJet ? 0.5 : (isGlider ? -0.5 : -0.5)]}>
+            {isGlider ? (
+                <boxGeometry args={[10, 0.05, 1]} />
+            ) : isJet ? (
+                <boxGeometry args={[5, 0.1, 2]} />
+            ) : (
+                <boxGeometry args={[6, 0.1, 1.5]} />
+            )}
+            <meshStandardMaterial color={wingColor} />
           </mesh>
           {/* Tail Vertical */}
           <mesh position={[0, 0.8, 1.5]}>
-            <boxGeometry args={[0.1, 1.5, 1]} />
-            <meshStandardMaterial color="#ef4444" />
+            <boxGeometry args={isJet ? [0.1, 1.2, 1.5] : [0.1, 1.5, 1]} />
+            <meshStandardMaterial color={wingColor} />
           </mesh>
           {/* Tail Horizontal */}
-          <mesh position={[0, 0.3, 1.5]}>
-            <boxGeometry args={[2.5, 0.1, 0.8]} />
-            <meshStandardMaterial color="#ef4444" />
-          </mesh>
+          {!isJet && (
+              <mesh position={[0, 0.3, 1.5]}>
+                <boxGeometry args={[2.5, 0.1, 0.8]} />
+                <meshStandardMaterial color={wingColor} />
+              </mesh>
+          )}
           {/* Propeller */}
-          <group position={[0, 0, -2.1]}>
-             <mesh rotation={[0, 0, 0]}>
-                <boxGeometry args={[3.5, 0.1, 0.1]} />
-                <meshStandardMaterial color="#333" />
-             </mesh>
-             <mesh rotation={[0, 0, Math.PI / 2]}>
-                <boxGeometry args={[3.5, 0.1, 0.1]} />
-                <meshStandardMaterial color="#333" />
-             </mesh>
-             <mesh>
-                 <sphereGeometry args={[0.3]} />
-                 <meshStandardMaterial color="#ef4444" />
-             </mesh>
-          </group>
+          {!isJet && !isGlider && (
+              <group position={[0, 0, -2.1]}>
+                 <mesh rotation={[0, 0, 0]}>
+                    <boxGeometry args={[3.5, 0.1, 0.1]} />
+                    <meshStandardMaterial color="#333" />
+                 </mesh>
+                 <mesh rotation={[0, 0, Math.PI / 2]}>
+                    <boxGeometry args={[3.5, 0.1, 0.1]} />
+                    <meshStandardMaterial color="#333" />
+                 </mesh>
+                 <mesh>
+                     <sphereGeometry args={[0.3]} />
+                     <meshStandardMaterial color="#ef4444" />
+                 </mesh>
+              </group>
+          )}
       </group>
       <spotLight position={[0, 0, -2]} intensity={1} angle={0.6} penumbra={1} distance={50} color="white" />
     </group>
@@ -187,80 +208,75 @@ const FlightNetwork = ({ landmarks }: { landmarks: Landmark[] }) => {
 };
 
 // --- Dynamic Map Terrain ---
-
 const MapSurface = ({ region, weather }: { region: string, weather: Weather }) => {
-    const [texture, displacement] = useLoader(THREE.TextureLoader, [
-        'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+    // We only load displacement for mountains/valleys, not the blue marble texture to avoid fake blue rivers everywhere
+    const [displacement] = useLoader(THREE.TextureLoader, [
         'https://unpkg.com/three-globe/example/img/earth-topology.png'
     ]);
     
+    // Determine Biome
+    const isDesert = ['Dubai', 'Egypt'].includes(region);
+    const isOcean = ['Pacific Ocean', 'Atlantic Ocean', 'Indian Ocean'].includes(region);
+    
+    // Load satellite texture based on biome
+    const getTextureUrl = () => {
+        if (weather === 'snowy') return 'https://images.unsplash.com/photo-1478719059408-592965723cbc?q=80&w=1024&auto=format&fit=crop';
+        if (isDesert) return 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?q=80&w=1024&auto=format&fit=crop';
+        if (isOcean) return 'https://images.unsplash.com/photo-1505672678657-cc7037095e60?q=80&w=1024&auto=format&fit=crop';
+        return 'https://images.unsplash.com/photo-1616422285623-13fa92004223?q=80&w=1024&auto=format&fit=crop'; // Default green forest/satellite
+    };
+
+    const satTexture = useLoader(THREE.TextureLoader, getTextureUrl());
+
     useMemo(() => {
-        if (texture) {
-            texture.wrapS = texture.wrapT = THREE.MirroredRepeatWrapping;
-            texture.repeat.set(4, 4); 
-            texture.colorSpace = THREE.SRGBColorSpace;
-            texture.needsUpdate = true;
-        }
         if (displacement) {
             displacement.wrapS = displacement.wrapT = THREE.MirroredRepeatWrapping;
-            displacement.repeat.set(4, 4);
+            displacement.repeat.set(8, 8); // Scale up repeat so it doesn't look squished over a massive plane
             displacement.needsUpdate = true;
         }
-    }, [texture, displacement]);
-
-    // Apply a light tint for weather
-    const groundColor = weather === 'snowy' ? '#e2e8f0' : (weather === 'rainy' ? '#cbd5e1' : '#ffffff');
+        if (satTexture) {
+            satTexture.wrapS = satTexture.wrapT = THREE.MirroredRepeatWrapping;
+            satTexture.repeat.set(12, 12); // Repeat to avoid blurriness over a large area
+            satTexture.colorSpace = THREE.SRGBColorSpace;
+            satTexture.needsUpdate = true;
+        }
+    }, [displacement, satTexture]);
 
     return (
         <group>
-            {/* Ground */}
+            {/* Ground - Make it massively larger than the playable boundary to hide edges! */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]} receiveShadow>
-                <planeGeometry args={[MAP_SIZE, MAP_SIZE, 256, 256]} />
+                <planeGeometry args={[4000, 4000, 256, 256]} />
                 <meshStandardMaterial 
-                    map={texture} 
-                    color={groundColor}
+                    map={satTexture}
                     displacementMap={displacement}
-                    displacementScale={25}
-                    roughness={weather === 'rainy' ? 0.4 : 0.9} 
-                    metalness={weather === 'rainy' ? 0.2 : 0.05} 
+                    displacementScale={isOcean ? 2 : 35} // Flat oceans, tall mountains
+                    roughness={weather === 'rainy' ? 0.3 : (isOcean ? 0.1 : 0.8)} 
+                    metalness={weather === 'rainy' ? 0.3 : (isOcean ? 0.8 : 0.05)} 
                 />
             </mesh>
             
-            {/* Base Ocean layer */}
+            {/* Base Ocean layer (water table) */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -8, 0]}>
-                <planeGeometry args={[MAP_SIZE, MAP_SIZE]} />
-                <meshStandardMaterial color={weather === 'snowy' ? "#bae6fd" : "#0369a1"} roughness={0.1} metalness={0.8} />
+                <planeGeometry args={[4000, 4000]} />
+                <meshStandardMaterial color={weather === 'snowy' ? "#bae6fd" : "#0284c7"} roughness={0.1} metalness={0.8} />
             </mesh>
         </group>
     );
 };
 
 // --- Landmark Billboard Marker ---
-
-const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: string }> = ({ landmark, isTarget, region }) => {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: string }> = ({ landmark, isTarget }) => {
   const ringRef = useRef<THREE.Mesh>(null);
-
-  useEffect(() => {
-      const loader = new THREE.TextureLoader();
-      // Use our reliable local asset as a base or fallback to prevent empty billboards
-      loader.load('/assets/monument.jpg', (tex) => {
-          setTexture(tex);
-      });
-      
-      // Attempt to load the specific landmark picture if possible, replacing the generic one
-      const encodedName = encodeURIComponent(landmark.name);
-      const imageUrl = `https://image.pollinations.ai/prompt/realistic_photograph_of_${encodedName}_in_${encodeURIComponent(region)}_transparent_background_monument?width=512&height=512&nologo=true`;
-      
-      loader.load(imageUrl, (tex) => {
-          setTexture(tex);
-      }, undefined, () => {/* Keep fallback */});
-  }, [landmark.name, region]);
+  const pinRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
       if (ringRef.current) {
           ringRef.current.rotation.y += 0.02; // Rotate the 3D ring continuously
           ringRef.current.position.y = 8 + Math.sin(state.clock.elapsedTime * 2) * 1.5; // Hover effect
+      }
+      if (pinRef.current) {
+          pinRef.current.position.y = 8 + Math.sin(state.clock.elapsedTime * 2) * 1.5;
       }
   });
 
@@ -269,7 +285,7 @@ const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: 
         {/* Animated 3D target indicator ring */}
         {!landmark.collected && (
             <mesh ref={ringRef} castShadow position={[0, 8, 0]}>
-                <torusGeometry args={[10, 0.5, 16, 64]} />
+                <torusGeometry args={[12, 0.4, 16, 64]} />
                 <meshStandardMaterial 
                     color={isTarget ? "#ef4444" : "#fcd34d"} 
                     emissive={isTarget ? "#ef4444" : "#fcd34d"} 
@@ -280,52 +296,47 @@ const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: 
             </mesh>
         )}
 
-        {/* Billboard makes the object always face the camera */}
-        <Billboard
-            follow={true}
-            lockX={false}
-            lockY={false}
-            lockZ={false} 
-        >
-            <group position={[0, 8, 0]}> {/* Lift it up so it stands ON the ground */}
-                <mesh castShadow>
-                    <planeGeometry args={[16, 16]} /> 
-                    {texture ? (
-                        <meshBasicMaterial map={texture} transparent opacity={landmark.collected ? 0.4 : 1} side={THREE.DoubleSide} />
-                    ) : (
-                         <meshStandardMaterial color="#cbd5e1" />
-                    )}
-                </mesh>
-                
-                {/* Frame/Border */}
-                <mesh position={[0, 0, -0.1]}>
-                     <planeGeometry args={[17, 17]} />
-                     <meshBasicMaterial color={landmark.collected ? "#22c55e" : "white"} />
-                </mesh>
-
-                {/* Status Indicator Cone */}
-                {!landmark.collected && isTarget && (
-                    <mesh position={[0, 12, 0]}>
-                         <coneGeometry args={[1.5, 3, 8]} rotation={[Math.PI, 0, 0]} />
-                         <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={2} />
-                    </mesh>
-                )}
-
-                {/* Text Label */}
+        {/* 3D Map Pin replacing the hallucinatory generated image */}
+        <group ref={pinRef}>
+            <mesh position={[0, 4, 0]} castShadow>
+                <sphereGeometry args={[4, 32, 32]} />
+                <meshStandardMaterial 
+                    color={landmark.collected ? "#22c55e" : (isTarget ? "#ef4444" : "#3b82f6")} 
+                    metalness={0.3} 
+                    roughness={0.2}
+                />
+            </mesh>
+            <mesh position={[0, -2, 0]} castShadow>
+                <coneGeometry args={[4, 12, 32]} rotation={[0, 0, Math.PI]} />
+                <meshStandardMaterial 
+                    color={landmark.collected ? "#22c55e" : (isTarget ? "#ef4444" : "#3b82f6")}
+                    metalness={0.3} 
+                    roughness={0.2} 
+                />
+            </mesh>
+            
+            {/* White core inside the pin for style */}
+            <mesh position={[0, 4, 3]}>
+                 <sphereGeometry args={[2, 16, 16]} />
+                 <meshStandardMaterial color="white" roughness={0.1} />
+            </mesh>
+            
+            {/* Text Label on Billboard above the pin */}
+            <Billboard follow={true}>
                 <Text
-                    position={[0, -11, 0]}
-                    fontSize={3}
+                    position={[0, 11, 0]}
+                    fontSize={4}
                     color="white"
                     anchorX="center"
-                    anchorY="top"
-                    outlineWidth={0.3}
+                    anchorY="bottom"
+                    outlineWidth={0.4}
                     outlineColor="black"
                     fontWeight="bold"
                 >
-                    {landmark.collected ? "✅ VISITED" : landmark.name}
+                    {landmark.collected ? "✅ " : ""}{landmark.name}
                 </Text>
-            </group>
-        </Billboard>
+            </Billboard>
+        </group>
 
         {/* Ground Shadow Blob */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.5, 0]}>
@@ -347,6 +358,7 @@ const GameController = ({
     onCheckCollisions, 
     isFlying,
     weather,
+    planeType,
     controlsRef,
     planePosRef
 }: { 
@@ -354,6 +366,7 @@ const GameController = ({
     onCheckCollisions: (pos: THREE.Vector3) => void,
     isFlying: boolean,
     weather: Weather,
+    planeType: import('../types').PlaneType,
     controlsRef: React.MutableRefObject<ControlState>,
     planePosRef: React.MutableRefObject<{x: number, z: number, rot: number}>
 }) => {
@@ -459,7 +472,7 @@ const GameController = ({
     });
 
     return (
-        <Plane position={planePos.current} rotation={planeRot.current} />
+        <Plane position={planePos.current} rotation={planeRot.current} type={planeType} />
     );
 };
 
@@ -471,12 +484,13 @@ interface Game3DProps {
     onUpdateStats: (direction: Direction, speed: number) => void;
     region: string;
     weather: Weather;
+    planeType: import('../types').PlaneType;
     controlsRef: React.MutableRefObject<ControlState>;
     planePosRef: React.MutableRefObject<{x: number, z: number, rot: number}>;
     isPaused: boolean;
 }
 
-export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateStats, region, weather, controlsRef, planePosRef, isPaused }) => {
+export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateStats, region, weather, planeType, controlsRef, planePosRef, isPaused }) => {
     
     const isStorm = weather === 'stormy';
     const isRain = weather === 'rainy';
@@ -552,6 +566,7 @@ export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateSt
                 onCheckCollisions={handleCheckCollisions}
                 isFlying={!isPaused}
                 weather={weather}
+                planeType={planeType}
                 controlsRef={controlsRef}
                 planePosRef={planePosRef}
             />

@@ -7,9 +7,12 @@ export interface Landmark {
   fact: string;
 }
 
+export type PlaneType = 'propeller' | 'jet' | 'glider';
+
 export interface GameState {
   screen: 'home' | 'start' | 'intro' | 'loading' | 'playing' | 'summary' | 'waitlist';
   selectedRegion: string;
+  selectedPlane: PlaneType;
   score: number;
   landmarks: Landmark[];
   totalLandmarks: number;
