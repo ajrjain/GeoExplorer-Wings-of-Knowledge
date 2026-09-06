@@ -283,7 +283,7 @@ export default function App() {
   const selectedCoords = REGION_COORDS[gameState.selectedRegion] || { lat: 0, lon: 0 };
 
   return (
-    <div className="w-full h-screen relative bg-slate-900 overflow-hidden">
+    <div className="w-full h-[100dvh] relative bg-slate-900 overflow-hidden">
       
       {/* 3D Layers */}
       {gameState.screen === 'intro' && (

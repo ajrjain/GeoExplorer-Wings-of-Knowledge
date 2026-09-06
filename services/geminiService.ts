@@ -17,57 +17,14 @@ export const fetchLandmarksForRegion = async (region: string): Promise<RegionDat
       return preloaded;
   }
 
-  // We are going to pass a dummy api key to satisfy the sdk, but our proxy handles the real key
-  const ai = new GoogleGenAI({ 
-      apiKey: 'dummy',
-      httpOptions: { baseUrl: window.location.origin + '/api/gemini' }
-  });
-
-  
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Generate data for a kids' flight game set in ${region}.
-      1. Write a short, exciting 2-sentence welcome intro from "Captain Echo" about flying over ${region}.
-      2. List 5 major visually distinct landmarks in ${region} (mountains, towers, natural wonders, and definitely include famous rivers or lakes).
-      
-      Output strictly valid JSON with this structure:
-      {
-        "intro": "string",
-        "landmarks": [
-            { "name": "string", "description": "visual description for image prompt", "fact": "fun fact for a child" }
-        ]
-      }`,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
-
-    const text = response.text || "{}";
-    const data = JSON.parse(text);
-    
-    const landmarks = (data.landmarks || []).map((item: any, index: number) => ({
-      id: `lm-${index}`,
-      name: item.name,
-      description: item.description,
-      fact: item.fact
-    }));
-
-    return {
-        landmarks,
-        introText: data.intro || `Welcome to ${region}! Get ready for an amazing adventure!`
-    };
-
-  } catch (error) {
-    console.error("Error fetching landmarks:", error);
-    return {
-        landmarks: [
-            { id: '1', name: 'Grand Mountain', description: 'A high snowy peak', fact: 'It touches the clouds!' },
-            { id: '2', name: 'Golden Tower', description: 'A shiny tall tower', fact: 'It glows at sunset.' },
-        ],
-        introText: `Welcome to ${region}! Let's fly around and find some treasures!`
-    };
-  }
+  // Fallback if region is somehow missing (avoiding AI key hit)
+  return {
+      landmarks: [
+          { id: '1', name: 'Grand Mountain', description: 'A high snowy peak', fact: 'It touches the clouds!' },
+          { id: '2', name: 'Golden Tower', description: 'A shiny tall tower', fact: 'It glows at sunset.' },
+      ],
+      introText: `Welcome to ${region}! Let's fly around and find some treasures!`
+  };
 };
 
 // --- Live API (Co-pilot) ---

@@ -206,8 +206,8 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
 
     if (gameState.screen === 'start') {
         return (
-            <div className="absolute inset-0 bg-slate-900 bg-opacity-95 flex flex-col items-center justify-center p-4 z-50 overflow-hidden">
-                <div className="max-w-4xl w-full text-center h-full max-h-screen flex flex-col py-8">
+            <div className="absolute inset-0 bg-slate-900 bg-opacity-95 flex flex-col items-center justify-center p-4 pt-8 pb-12 z-50 overflow-hidden">
+                <div className="max-w-4xl w-full text-center h-full flex flex-col py-4 sm:py-8">
                     <h1 className="text-4xl sm:text-6xl font-bold text-sky-400 mb-2 drop-shadow-lg tracking-wider shrink-0">GEO EXPLORER</h1>
                     <p className="text-xl sm:text-2xl text-slate-300 mb-4 shrink-0">Wings of Knowledge</p>
                     
@@ -307,7 +307,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
     }
 
     return (
-        <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-6">
+        <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-4 sm:p-6 pb-8 sm:pb-6">
             {/* Top Bar */}
             <div className="flex justify-between items-start pointer-events-auto">
                 <div className="bg-slate-900/80 backdrop-blur rounded-2xl p-4 border border-slate-700 flex gap-6 text-white shadow-lg">
@@ -359,9 +359,9 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                 </div>
             </div>
 
-            {/* Bottom Right - Fact Panel */}
+            {/* Fact Panel - Top on mobile, Bottom right on desktop */}
             {currentFact && (
-                <div className="absolute bottom-6 right-6 pointer-events-auto z-50 flex animate-in slide-in-from-right duration-500 drop-shadow-2xl max-w-xs w-full">
+                <div className="absolute top-24 right-4 sm:top-auto sm:bottom-6 sm:right-6 pointer-events-auto z-50 flex animate-in slide-in-from-right duration-500 drop-shadow-2xl max-w-xs w-[calc(100%-2rem)] sm:w-full">
                     <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 w-full shadow-2xl border-l-8 border-sky-500 flex flex-col">
                         <div className="flex justify-between items-start mb-2">
                             <h3 className="text-xl font-bold text-slate-800 leading-tight">{currentFact.name}</h3>

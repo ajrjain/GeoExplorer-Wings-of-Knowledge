@@ -209,9 +209,9 @@ const FlightNetwork = ({ landmarks }: { landmarks: Landmark[] }) => {
 
 // --- Dynamic Map Terrain ---
 const MapSurface = ({ region, weather }: { region: string, weather: Weather }) => {
-    // We only load displacement for mountains/valleys, not the blue marble texture to avoid fake blue rivers everywhere
+    // We only load displacement for mountains/valleys locally
     const [displacement] = useLoader(THREE.TextureLoader, [
-        'https://unpkg.com/three-globe/example/img/earth-topology.png'
+        '/assets/earth-topology.png'
     ]);
     
     // Determine Biome
@@ -220,10 +220,10 @@ const MapSurface = ({ region, weather }: { region: string, weather: Weather }) =
     
     // Load satellite texture based on biome
     const getTextureUrl = () => {
-        if (weather === 'snowy') return 'https://images.unsplash.com/photo-1478719059408-592965723cbc?q=80&w=1024&auto=format&fit=crop';
-        if (isDesert) return 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?q=80&w=1024&auto=format&fit=crop';
-        if (isOcean) return 'https://images.unsplash.com/photo-1505672678657-cc7037095e60?q=80&w=1024&auto=format&fit=crop';
-        return 'https://images.unsplash.com/photo-1616422285623-13fa92004223?q=80&w=1024&auto=format&fit=crop'; // Default green forest/satellite
+        if (weather === 'snowy') return '/assets/terrain_snow.jpg';
+        if (isDesert) return '/assets/terrain_desert.jpg';
+        if (isOcean) return '/assets/terrain_ocean.jpg';
+        return '/assets/terrain_forest.jpg'; // Default green forest/satellite
     };
 
     const satTexture = useLoader(THREE.TextureLoader, getTextureUrl());
@@ -236,7 +236,7 @@ const MapSurface = ({ region, weather }: { region: string, weather: Weather }) =
         }
         if (satTexture) {
             satTexture.wrapS = satTexture.wrapT = THREE.MirroredRepeatWrapping;
-            satTexture.repeat.set(12, 12); // Repeat to avoid blurriness over a large area
+            satTexture.repeat.set(24, 24); // Repeat to avoid blurriness over a large area
             satTexture.colorSpace = THREE.SRGBColorSpace;
             satTexture.needsUpdate = true;
         }
@@ -265,23 +265,94 @@ const MapSurface = ({ region, weather }: { region: string, weather: Weather }) =
     );
 };
 
+// --- Confetti Particles ---
+const Confetti = ({ position }: { position: THREE.Vector3 }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const [particles] = useState(() => {
+        return Array.from({ length: 30 }).map(() => ({
+            pos: new THREE.Vector3(0, 0, 0),
+            vel: new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 4 + 2, (Math.random() - 0.5) * 4),
+            color: new THREE.Color().setHSL(Math.random(), 1, 0.5),
+            rot: new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI),
+            rotSpeed: new THREE.Euler(Math.random() * 0.2, Math.random() * 0.2, Math.random() * 0.2)
+        }));
+    });
+
+    useFrame(() => {
+        if (!groupRef.current) return;
+        groupRef.current.children.forEach((child, i) => {
+            const p = particles[i];
+            p.pos.add(p.vel);
+            p.vel.y -= 0.1; // gravity
+            p.rot.x += p.rotSpeed.x;
+            p.rot.y += p.rotSpeed.y;
+            p.rot.z += p.rotSpeed.z;
+            child.position.copy(p.pos);
+            child.rotation.copy(p.rot);
+        });
+    });
+
+    return (
+        <group position={position} ref={groupRef}>
+            {particles.map((p, i) => (
+                <mesh key={i}>
+                    <planeGeometry args={[1, 1]} />
+                    <meshBasicMaterial color={p.color} side={THREE.DoubleSide} />
+                </mesh>
+            ))}
+        </group>
+    );
+};
+
 // --- Landmark Billboard Marker ---
 const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: string }> = ({ landmark, isTarget }) => {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
   const ringRef = useRef<THREE.Mesh>(null);
-  const pinRef = useRef<THREE.Group>(null);
+  const billboardRef = useRef<THREE.Group>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const prevCollected = useRef(landmark.collected);
+
+  useEffect(() => {
+      const loader = new THREE.TextureLoader();
+      // Load the locally cached Wikipedia image
+      loader.load(`/assets/landmarks/${landmark.id}.jpg`, (tex) => {
+          setTexture(tex);
+      }, undefined, () => {
+          // generic fallback if Wikipedia fetch failed
+          loader.load('/assets/monument.jpg', (fallbackTex) => {
+              setTexture(fallbackTex);
+          });
+      });
+  }, [landmark.id]);
+
+  useEffect(() => {
+      if (landmark.collected && !prevCollected.current) {
+          setShowConfetti(true);
+          // Play a celebration speech
+          if (window.speechSynthesis) {
+              const msg = new SpeechSynthesisUtterance(`Hurray! You found ${landmark.name}!`);
+              msg.volume = 1;
+              window.speechSynthesis.speak(msg);
+          }
+          setTimeout(() => setShowConfetti(false), 3000);
+      }
+      prevCollected.current = landmark.collected;
+  }, [landmark.collected, landmark.name]);
 
   useFrame((state) => {
       if (ringRef.current) {
           ringRef.current.rotation.y += 0.02; // Rotate the 3D ring continuously
           ringRef.current.position.y = 8 + Math.sin(state.clock.elapsedTime * 2) * 1.5; // Hover effect
       }
-      if (pinRef.current) {
-          pinRef.current.position.y = 8 + Math.sin(state.clock.elapsedTime * 2) * 1.5;
+      if (billboardRef.current) {
+          billboardRef.current.position.y = 8 + Math.sin(state.clock.elapsedTime * 2) * 1.5;
       }
   });
 
   return (
     <group position={landmark.position}>
+        {showConfetti && <Confetti position={new THREE.Vector3(0, 10, 0)} />}
+
         {/* Animated 3D target indicator ring */}
         {!landmark.collected && (
             <mesh ref={ringRef} castShadow position={[0, 8, 0]}>
@@ -296,47 +367,47 @@ const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: 
             </mesh>
         )}
 
-        {/* 3D Map Pin replacing the hallucinatory generated image */}
-        <group ref={pinRef}>
-            <mesh position={[0, 4, 0]} castShadow>
-                <sphereGeometry args={[4, 32, 32]} />
-                <meshStandardMaterial 
-                    color={landmark.collected ? "#22c55e" : (isTarget ? "#ef4444" : "#3b82f6")} 
-                    metalness={0.3} 
-                    roughness={0.2}
-                />
-            </mesh>
-            <mesh position={[0, -2, 0]} castShadow>
-                <coneGeometry args={[4, 12, 32]} rotation={[0, 0, Math.PI]} />
-                <meshStandardMaterial 
-                    color={landmark.collected ? "#22c55e" : (isTarget ? "#ef4444" : "#3b82f6")}
-                    metalness={0.3} 
-                    roughness={0.2} 
-                />
-            </mesh>
-            
-            {/* White core inside the pin for style */}
-            <mesh position={[0, 4, 3]}>
-                 <sphereGeometry args={[2, 16, 16]} />
-                 <meshStandardMaterial color="white" roughness={0.1} />
-            </mesh>
-            
-            {/* Text Label on Billboard above the pin */}
-            <Billboard follow={true}>
+        {/* Billboard makes the object always face the camera */}
+        <Billboard follow={true}>
+            <group ref={billboardRef}>
+                <mesh castShadow>
+                    <planeGeometry args={[16, 16]} /> 
+                    {texture ? (
+                        <meshBasicMaterial map={texture} transparent opacity={landmark.collected ? 0.6 : 1} side={THREE.DoubleSide} />
+                    ) : (
+                         <meshStandardMaterial color={landmark.collected ? "#22c55e" : "#3b82f6"} />
+                    )}
+                </mesh>
+                
+                {/* Frame/Border */}
+                <mesh position={[0, 0, -0.1]}>
+                     <planeGeometry args={[17, 17]} />
+                     <meshBasicMaterial color={landmark.collected ? "#22c55e" : "white"} />
+                </mesh>
+
+                {/* Status Indicator Cone */}
+                {!landmark.collected && isTarget && (
+                    <mesh position={[0, 12, 0]}>
+                         <coneGeometry args={[1.5, 3, 8]} rotation={[Math.PI, 0, 0]} />
+                         <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={2} />
+                    </mesh>
+                )}
+
+                {/* Text Label */}
                 <Text
-                    position={[0, 11, 0]}
-                    fontSize={4}
+                    position={[0, -11, 0]}
+                    fontSize={3}
                     color="white"
                     anchorX="center"
-                    anchorY="bottom"
+                    anchorY="top"
                     outlineWidth={0.4}
                     outlineColor="black"
                     fontWeight="bold"
                 >
-                    {landmark.collected ? "✅ " : ""}{landmark.name}
+                    {landmark.collected ? "✅ VISITED" : landmark.name}
                 </Text>
-            </Billboard>
-        </group>
+            </group>
+        </Billboard>
 
         {/* Ground Shadow Blob */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.5, 0]}>
