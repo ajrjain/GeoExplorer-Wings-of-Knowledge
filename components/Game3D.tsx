@@ -432,6 +432,7 @@ const GameController = ({
     isFlying,
     weather,
     planeType,
+    region,
     controlsRef,
     planePosRef,
     obstaclesRef
@@ -442,6 +443,7 @@ const GameController = ({
     isFlying: boolean,
     weather: Weather,
     planeType: import('../types').PlaneType,
+    region: string,
     controlsRef: React.MutableRefObject<ControlState>,
     planePosRef: React.MutableRefObject<{x: number, z: number, rot: number}>,
     obstaclesRef: React.MutableRefObject<Obstacle[]>
@@ -517,7 +519,7 @@ const GameController = ({
              speed.current = PLANE_SPEED;
         }
         
-        planePos.current.y = Math.max(10, Math.min(80, planePos.current.y));
+        planePos.current.y = Math.max(-5, Math.min(80, planePos.current.y));
         planeRot.current.x = THREE.MathUtils.lerp(planeRot.current.x, targetPitch, delta * 2);
 
         // Forward Movement (Along -Z axis)
@@ -543,20 +545,22 @@ const GameController = ({
         planePosRef.current.z = planePos.current.z;
         planePosRef.current.rot = planeRot.current.y;
 
-        // Obstacle Collision Check
+        // Collision Checks
         const currentPos = planePos.current.clone();
+
+        // 1. Check natural terrain crash
+        // The terrain displacement goes up to y=35 on land and y=2 on ocean.
+        // We do a hard baseline collision. 
+        const isOcean = ['Pacific Ocean', 'Atlantic Ocean', 'Indian Ocean'].includes(region);
+        const crashAltitude = isOcean ? 3 : 15;
+        if (currentPos.y <= crashAltitude) {
+            onCrash(isOcean ? "Crashed into the ocean!" : "Crashed into the terrain!");
+            return;
+        }
+
+        // 2. Check AI plane collision
         for (const obs of obstaclesRef.current) {
-            if (obs.type === 'mountain') {
-                // simple 2d distance for cone base, but cone gets narrower at top
-                const dist2D = new THREE.Vector2(currentPos.x, currentPos.z).distanceTo(new THREE.Vector2(obs.pos.x, obs.pos.z));
-                // radius at given y:
-                const ratio = Math.max(0, 1 - (currentPos.y / (obs.height || 1)));
-                const radiusAtY = obs.radius * ratio;
-                if (dist2D < radiusAtY && currentPos.y < (obs.height || 0)) {
-                    onCrash("Crashed into a mountain peak!");
-                    return;
-                }
-            } else if (obs.type === 'plane') {
+            if (obs.type === 'plane') {
                 const dist = currentPos.distanceTo(obs.pos);
                 if (dist < obs.radius + 2) {
                     onCrash("Mid-air collision with another aircraft!");
@@ -671,6 +675,7 @@ export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateSt
                 isFlying={!isPaused}
                 weather={weather}
                 planeType={planeType}
+                region={region}
                 controlsRef={controlsRef}
                 planePosRef={planePosRef}
                 obstaclesRef={obstaclesRef}

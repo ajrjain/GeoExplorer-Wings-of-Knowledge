@@ -4,10 +4,9 @@ import * as THREE from 'three';
 
 export interface Obstacle {
     id: string;
-    type: 'mountain' | 'plane';
+    type: 'plane';
     pos: THREE.Vector3;
     radius: number;
-    height?: number;
     vel?: THREE.Vector3;
 }
 
@@ -54,20 +53,6 @@ export const ObstaclesManager = ({
     // Generate initial obstacles
     const initialObstacles = useMemo(() => {
         const obs: Obstacle[] = [];
-        const isOcean = ['Pacific Ocean', 'Atlantic Ocean', 'Indian Ocean'].includes(region);
-        
-        // Add mountains if not ocean - REDUCED COUNT & SIZE
-        if (!isOcean) {
-            for(let i=0; i<12; i++) {
-                obs.push({
-                    id: `mtn-${i}`,
-                    type: 'mountain',
-                    pos: new THREE.Vector3((Math.random()-0.5)*800, 0, (Math.random()-0.5)*800),
-                    radius: 12 + Math.random()*10, // Smaller collision base
-                    height: 30 + Math.random()*30 // Lower mountains
-                });
-            }
-        }
         
         // Add flying planes - REDUCED COUNT & HITBOX
         for(let i=0; i<6; i++) {
@@ -86,24 +71,9 @@ export const ObstaclesManager = ({
         obstaclesRef.current = initialObstacles;
     }, [initialObstacles, obstaclesRef]);
 
-    const mtnMesh = useRef<THREE.InstancedMesh>(null);
-    const dummy = useMemo(() => new THREE.Object3D(), []);
-
-    const mountains = initialObstacles.filter(o => o.type === 'mountain');
     const planes = initialObstacles.filter(o => o.type === 'plane');
 
     useFrame(() => {
-        if (mtnMesh.current) {
-            mountains.forEach((m, i) => {
-                dummy.position.copy(m.pos);
-                dummy.position.y = (m.height || 0) / 2; // center of cone
-                dummy.scale.set(m.radius, m.height || 0, m.radius);
-                dummy.updateMatrix();
-                mtnMesh.current!.setMatrixAt(i, dummy.matrix);
-            });
-            mtnMesh.current.instanceMatrix.needsUpdate = true;
-        }
-
         // Update plane logic
         planes.forEach((p) => {
             p.pos.add(p.vel!);
@@ -118,13 +88,6 @@ export const ObstaclesManager = ({
 
     return (
         <group>
-            {mountains.length > 0 && (
-                <instancedMesh ref={mtnMesh} args={[undefined, undefined, mountains.length]} castShadow>
-                    <coneGeometry args={[1, 1, 8]} />
-                    <meshStandardMaterial color="#0f766e" roughness={0.9} />
-                </instancedMesh>
-            )}
-            
             {planes.map(p => (
                 <AIPlane key={p.id} data={p} />
             ))}
