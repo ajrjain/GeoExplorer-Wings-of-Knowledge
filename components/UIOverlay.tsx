@@ -17,6 +17,7 @@ interface UIOverlayProps {
     onResume: () => void;
     onReturnToMenu: () => void;
     currentFact: Landmark | null;
+    crashReason?: string;
     controlsRef: React.MutableRefObject<ControlState>;
     planePosRef?: React.MutableRefObject<{x: number, z: number, rot: number}>;
 }
@@ -123,6 +124,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
     onResume,
     onReturnToMenu,
     currentFact,
+    crashReason,
     controlsRef,
     planePosRef
 }) => {
@@ -301,6 +303,27 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                     >
                         Play Again
                     </button>
+                 </div>
+            </div>
+        );
+    }
+
+    if (gameState.screen === 'gameover') {
+        return (
+            <div className="absolute inset-0 bg-red-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 z-50 pointer-events-auto animate-in fade-in duration-500">
+                <div className="max-w-md w-full text-center bg-slate-900/80 p-8 rounded-3xl border-2 border-red-500 shadow-2xl">
+                    <h1 className="text-5xl font-black text-red-500 mb-4 animate-bounce">MAYDAY!</h1>
+                    <h2 className="text-2xl font-bold text-white mb-2">You Crashed!</h2>
+                    <p className="text-red-200 mb-8">{crashReason || "Flight integrity compromised."}</p>
+                    
+                    <div className="flex flex-col gap-4">
+                        <button 
+                            onClick={onReset}
+                            className="bg-red-600 hover:bg-red-500 text-white font-bold py-4 rounded-full text-xl transition-colors shadow-lg"
+                        >
+                            Return to Base
+                        </button>
+                    </div>
                  </div>
             </div>
         );

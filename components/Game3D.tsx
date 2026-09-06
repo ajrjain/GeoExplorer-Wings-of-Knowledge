@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
 import { Sky, Stars, Text, Float, Billboard, Grid, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { Landmark, Direction, Weather, ControlState } from '../types';
+import { ObstaclesManager, Obstacle } from './Obstacles';
 
 // --- Assets & Constants ---
 const PLANE_SPEED = 0.5;
@@ -427,19 +428,23 @@ const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: 
 const GameController = ({ 
     onUpdatePosition, 
     onCheckCollisions, 
+    onCrash,
     isFlying,
     weather,
     planeType,
     controlsRef,
-    planePosRef
+    planePosRef,
+    obstaclesRef
 }: { 
     onUpdatePosition: (pos: THREE.Vector3, rot: number) => void,
     onCheckCollisions: (pos: THREE.Vector3) => void,
+    onCrash: (reason: string) => void,
     isFlying: boolean,
     weather: Weather,
     planeType: import('../types').PlaneType,
     controlsRef: React.MutableRefObject<ControlState>,
-    planePosRef: React.MutableRefObject<{x: number, z: number, rot: number}>
+    planePosRef: React.MutableRefObject<{x: number, z: number, rot: number}>,
+    obstaclesRef: React.MutableRefObject<Obstacle[]>
 }) => {
     const { camera } = useThree();
     const planePos = useRef(new THREE.Vector3(0, 30, 0)); 
@@ -538,8 +543,30 @@ const GameController = ({
         planePosRef.current.z = planePos.current.z;
         planePosRef.current.rot = planeRot.current.y;
 
-        onUpdatePosition(planePos.current.clone(), planeRot.current.y);
-        onCheckCollisions(planePos.current.clone());
+        // Obstacle Collision Check
+        const currentPos = planePos.current.clone();
+        for (const obs of obstaclesRef.current) {
+            if (obs.type === 'mountain') {
+                // simple 2d distance for cone base, but cone gets narrower at top
+                const dist2D = new THREE.Vector2(currentPos.x, currentPos.z).distanceTo(new THREE.Vector2(obs.pos.x, obs.pos.z));
+                // radius at given y:
+                const ratio = Math.max(0, 1 - (currentPos.y / (obs.height || 1)));
+                const radiusAtY = obs.radius * ratio;
+                if (dist2D < radiusAtY && currentPos.y < (obs.height || 0)) {
+                    onCrash("Crashed into a mountain peak!");
+                    return;
+                }
+            } else if (obs.type === 'plane') {
+                const dist = currentPos.distanceTo(obs.pos);
+                if (dist < obs.radius + 2) {
+                    onCrash("Mid-air collision with another aircraft!");
+                    return;
+                }
+            }
+        }
+
+        onUpdatePosition(currentPos, planeRot.current.y);
+        onCheckCollisions(currentPos);
     });
 
     return (
@@ -553,6 +580,7 @@ interface Game3DProps {
     landmarks: Landmark[];
     onCollect: (id: string) => void;
     onUpdateStats: (direction: Direction, speed: number) => void;
+    onCrash: (reason: string) => void;
     region: string;
     weather: Weather;
     planeType: import('../types').PlaneType;
@@ -561,11 +589,13 @@ interface Game3DProps {
     isPaused: boolean;
 }
 
-export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateStats, region, weather, planeType, controlsRef, planePosRef, isPaused }) => {
+export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateStats, onCrash, region, weather, planeType, controlsRef, planePosRef, isPaused }) => {
     
     const isStorm = weather === 'stormy';
     const isRain = weather === 'rainy';
     const isClear = weather === 'sunny';
+
+    const obstaclesRef = useRef<Obstacle[]>([]);
 
     const fogColor = isStorm ? '#0f172a' : (isRain ? '#475569' : '#bae6fd');
     const fogNear = isStorm ? 50 : (isRain ? 100 : 200);
@@ -631,15 +661,19 @@ export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateSt
 
             <MapSurface region={region} weather={weather} />
             <FlightNetwork landmarks={landmarks} />
+            
+            <ObstaclesManager region={region} obstaclesRef={obstaclesRef} />
 
             <GameController 
                 onUpdatePosition={handleUpdatePosition} 
                 onCheckCollisions={handleCheckCollisions}
+                onCrash={onCrash}
                 isFlying={!isPaused}
                 weather={weather}
                 planeType={planeType}
                 controlsRef={controlsRef}
                 planePosRef={planePosRef}
+                obstaclesRef={obstaclesRef}
             />
 
             {landmarks.map(lm => (

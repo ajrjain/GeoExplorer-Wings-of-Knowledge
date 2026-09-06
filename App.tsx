@@ -270,6 +270,11 @@ export default function App() {
       setGameState(prev => ({ ...prev, screen: 'waitlist' as any }));
   };
 
+  const handleCrash = useCallback((reason: string) => {
+      setGameState(prev => ({ ...prev, screen: 'gameover', isPaused: true }));
+      setIntroText(reason); 
+  }, []);
+
   const handleUpdateStats = useCallback((direction: Direction, speed: number) => {
       setCurrentDirection(direction);
   }, []);
@@ -304,12 +309,13 @@ export default function App() {
       )}
 
       {/* 3D Layers - Render Game3D underneath during intro so it loads textures early */}
-      {(gameState.screen === 'intro' || gameState.screen === 'playing' || gameState.screen === 'summary') && (
-          <div className={`absolute inset-0 z-0 transition-opacity duration-1000 ${gameState.screen === 'playing' ? 'opacity-100' : 'opacity-0'}`}>
+      {(gameState.screen === 'intro' || gameState.screen === 'playing' || gameState.screen === 'summary' || gameState.screen === 'gameover') && (
+          <div className={`absolute inset-0 z-0 transition-opacity duration-1000 ${['playing', 'summary', 'gameover'].includes(gameState.screen) ? 'opacity-100' : 'opacity-0'}`}>
              <Game3D 
                 landmarks={gameState.landmarks} 
                 onCollect={handleCollect}
                 onUpdateStats={handleUpdateStats}
+                onCrash={handleCrash}
                 region={gameState.selectedRegion}
                 weather={currentWeather}
                 planeType={gameState.selectedPlane}
@@ -335,6 +341,7 @@ export default function App() {
         onPause={handlePause}
         onResume={handleResume}
         onReturnToMenu={handleReturnToMenu}
+        crashReason={introText}
         currentFact={currentFact}
         controlsRef={controlsRef}
         planePosRef={planePosRef}

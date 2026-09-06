@@ -10,7 +10,7 @@ export interface Landmark {
 export type PlaneType = 'propeller' | 'jet' | 'glider';
 
 export interface GameState {
-  screen: 'home' | 'start' | 'intro' | 'loading' | 'playing' | 'summary' | 'waitlist';
+  screen: 'home' | 'start' | 'intro' | 'loading' | 'playing' | 'summary' | 'waitlist' | 'gameover';
   selectedRegion: string;
   selectedPlane: PlaneType;
   score: number;
