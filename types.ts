@@ -34,3 +34,12 @@ export interface ControlState {
   left: boolean;
   right: boolean;
 }
+
+export type DialogCategory = 'start' | 'ambient' | 'collect' | 'crash';
+
+export interface DialogMessage {
+  id: string;
+  category: DialogCategory;
+  text: string;
+  duration?: number;
+}

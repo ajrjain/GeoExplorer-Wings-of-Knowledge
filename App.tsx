@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Game3D } from './components/Game3D';
 import { EarthIntro } from './components/EarthIntro';
 import { UIOverlay } from './components/UIOverlay';
-import { GameState, Direction, Landmark, Weather, ControlState } from './types';
+import { GameState, Direction, Landmark, Weather, ControlState, DialogMessage } from './types';
 import { fetchLandmarksForRegion, GeminiLiveClient, RegionData } from './services/geminiService';
+import { DialogueSystem } from './components/DialogueManager';
 
 const MOCK_LANDMARKS: Omit<Landmark, 'position' | 'collected'>[] = [
     { id: 'm1', name: 'Central Plaza', description: 'The heart of the city.', fact: 'People gather here for celebrations.' },
@@ -53,9 +54,11 @@ export default function App() {
   const [isIntroComplete, setIsIntroComplete] = useState(false);
   const [dataReady, setDataReady] = useState(false);
   const [playCount, setPlayCount] = useState(0);
+  const [activeDialog, setActiveDialog] = useState<DialogMessage | null>(null);
 
   const liveClientRef = useRef<GeminiLiveClient | null>(null);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const dialogTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Shared state for controls (Keyboard + Touch)
   const controlsRef = useRef<ControlState>({
@@ -67,11 +70,35 @@ export default function App() {
 
   const planePosRef = useRef({ x: 0, z: 0, rot: 0 });
 
+  const triggerDialog = useCallback((category: import('./types').DialogCategory) => {
+    const dialog = DialogueSystem.getRandomDialogue(category);
+    setActiveDialog(dialog);
+    DialogueSystem.speak(dialog.text);
+    
+    if (dialogTimerRef.current) clearTimeout(dialogTimerRef.current);
+    dialogTimerRef.current = setTimeout(() => {
+        setActiveDialog(null);
+    }, 6000); // clear after 6s
+  }, []);
+
+  // Random ambient chatter effect
+  useEffect(() => {
+    if (gameState.screen !== 'playing' || gameState.isPaused) return;
+    
+    const interval = setInterval(() => {
+        if (Math.random() > 0.5 && !activeDialog) { // 50% chance every 20s if no active dialog
+            triggerDialog('ambient');
+        }
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [gameState.screen, gameState.isPaused, activeDialog, triggerDialog]);
+
   useEffect(() => {
     liveClientRef.current = new GeminiLiveClient();
     return () => {
         liveClientRef.current?.disconnect();
         window.speechSynthesis.cancel();
+        if (dialogTimerRef.current) clearTimeout(dialogTimerRef.current);
     };
   }, []);
 
@@ -110,6 +137,17 @@ export default function App() {
         setGameState(prev => ({ ...prev, screen: 'waitlist' as any }));
         return;
     }
+    
+    // Unlock Audio Contexts
+    try {
+        DialogueSystem.playRadioBeep();
+        if ('speechSynthesis' in window) {
+            const silent = new SpeechSynthesisUtterance('');
+            silent.volume = 0;
+            window.speechSynthesis.speak(silent);
+        }
+    } catch(e) {}
+
     setPlayCount(prev => prev + 1);
 
     // 1. Reset State & Start Intro
@@ -179,8 +217,9 @@ export default function App() {
   useEffect(() => {
       if (gameState.screen === 'intro' && isIntroComplete && dataReady) {
           setGameState(prev => ({ ...prev, screen: 'playing' }));
+          triggerDialog('start');
       }
-  }, [isIntroComplete, dataReady, gameState.screen]);
+  }, [isIntroComplete, dataReady, gameState.screen, triggerDialog]);
 
   const handleToggleCopilot = async () => {
     if (!liveClientRef.current) {
@@ -222,6 +261,7 @@ export default function App() {
         const won = collectedCount === prev.totalLandmarks;
 
         setCurrentFact(newLandmarks[lmIndex]);
+        triggerDialog('collect');
 
         if (won) {
             setTimeout(() => {
@@ -236,7 +276,7 @@ export default function App() {
             landmarks: newLandmarks
         };
     });
-  }, []);
+  }, [triggerDialog]);
 
   const handleCloseFact = () => {
       setCurrentFact(null);
@@ -273,7 +313,8 @@ export default function App() {
   const handleCrash = useCallback((reason: string) => {
       setGameState(prev => ({ ...prev, screen: 'gameover', isPaused: true }));
       setIntroText(reason); 
-  }, []);
+      triggerDialog('crash');
+  }, [triggerDialog]);
 
   const handleUpdateStats = useCallback((direction: Direction, speed: number) => {
       setCurrentDirection(direction);
@@ -332,6 +373,7 @@ export default function App() {
         currentDirection={currentDirection}
         copilotConnected={copilotConnected}
         lastTranscription={lastTranscription}
+        activeDialog={activeDialog}
         onStartGame={handleStartGame}
         onToggleCopilot={handleToggleCopilot}
         onReset={handleReset}

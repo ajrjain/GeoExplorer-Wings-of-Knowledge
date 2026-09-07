@@ -7,6 +7,7 @@ interface UIOverlayProps {
     currentDirection: Direction;
     copilotConnected: boolean;
     lastTranscription: string;
+    activeDialog: import('../types').DialogMessage | null;
     onStartGame: (region: string, weather: import('../types').Weather, planeType: import('../types').PlaneType) => void;
     onToggleCopilot: () => void;
     onReset: () => void;
@@ -114,6 +115,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
     currentDirection,
     copilotConnected,
     lastTranscription,
+    activeDialog,
     onStartGame,
     onToggleCopilot,
     onReset,
@@ -392,6 +394,19 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                     )}
                 </div>
             </div>
+
+            {/* Active Dialogue Popup */}
+            {activeDialog && (
+                <div className="absolute top-24 left-1/2 transform -translate-x-1/2 pointer-events-none z-40 animate-in slide-in-from-top fade-in duration-300">
+                    <div className={`
+                        flex items-center gap-4 px-6 py-4 rounded-full backdrop-blur-md shadow-2xl border-2
+                        ${activeDialog.category === 'crash' ? 'bg-red-900/90 border-red-500' : 'bg-slate-900/90 border-sky-500'}
+                    `}>
+                        <div className={`w-3 h-3 rounded-full animate-ping ${activeDialog.category === 'crash' ? 'bg-red-400' : 'bg-sky-400'}`} />
+                        <span className="text-white font-mono text-lg max-w-md text-center">{activeDialog.text}</span>
+                    </div>
+                </div>
+            )}
 
             {/* Fact Panel - Top on mobile, Bottom right on desktop */}
             {currentFact && (
