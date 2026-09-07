@@ -131,6 +131,9 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
 
     const [selectedWeather, setSelectedWeather] = React.useState<import('../types').Weather>('sunny');
     const [selectedPlaneUI, setSelectedPlaneUI] = React.useState<import('../types').PlaneType>('propeller');
+    const [showTouchControls, setShowTouchControls] = React.useState<boolean>(
+        typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+    );
 
     // Handlers for touch controls
     const setControl = (key: keyof ControlState, active: boolean) => {
@@ -351,6 +354,14 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                     </div>
                     <div className="w-px bg-slate-600"></div>
                     <button 
+                        onClick={() => setShowTouchControls(!showTouchControls)} 
+                        className={`font-bold transition-colors flex items-center ${showTouchControls ? 'text-sky-400' : 'text-slate-300 hover:text-white'}`}
+                        title="Toggle Touch Controls"
+                    >
+                        👆 Touch
+                    </button>
+                    <div className="w-px bg-slate-600"></div>
+                    <button 
                         onClick={onPause} 
                         className="font-bold text-slate-300 hover:text-white transition-colors flex items-center"
                     >
@@ -413,7 +424,8 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
             <div className="flex justify-between items-end w-full">
                 
                 {/* Mobile Controls Left (Turn) */}
-                <div className="flex gap-4 pointer-events-auto md:hidden">
+                {showTouchControls && (
+                <div className="flex gap-4 pointer-events-auto">
                     <button 
                         className="bg-white/20 hover:bg-white/30 active:bg-sky-500/50 backdrop-blur-md p-6 rounded-full border border-white/20 touch-none select-none transition-colors"
                         onPointerDown={() => setControl('left', true)}
@@ -431,6 +443,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                         <ArrowRight className="text-white w-8 h-8" />
                     </button>
                 </div>
+                )}
 
                 {/* Compass (Hidden on small mobile screens to save space, or just center it) */}
                 <div className="hidden md:flex bg-slate-900/80 backdrop-blur rounded-full w-32 h-32 border-4 border-slate-700 items-center justify-center relative shadow-xl mx-auto">
@@ -445,7 +458,8 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                 </div>
 
                 {/* Mobile Controls Right (Speed) */}
-                 <div className="flex flex-col gap-4 pointer-events-auto md:hidden">
+                {showTouchControls && (
+                 <div className="flex flex-col gap-4 pointer-events-auto">
                     <button 
                         className="bg-white/20 hover:bg-white/30 active:bg-sky-500/50 backdrop-blur-md p-6 rounded-full border border-white/20 touch-none select-none transition-colors"
                         onPointerDown={() => setControl('up', true)}
@@ -463,8 +477,10 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                         <ArrowDown className="text-white w-8 h-8" />
                     </button>
                 </div>
+                )}
 
                 {/* Desktop Instructions */}
+                {!showTouchControls && (
                 <div className="hidden md:block bg-slate-900/80 backdrop-blur rounded-2xl p-4 text-white text-sm">
                     <div className="flex flex-col gap-1 opacity-80">
                         <p>Controls:</p>
@@ -476,6 +492,7 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
                         </div>
                     </div>
                 </div>
+                )}
             </div>
 
             {/* Pause Menu */}
