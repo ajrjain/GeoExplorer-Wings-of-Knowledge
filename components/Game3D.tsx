@@ -1,9 +1,10 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
-import { Sky, Stars, Text, Float, Billboard, Grid, Line } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Sky, Text, Billboard, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { Landmark, Direction, Weather, ControlState } from '../types';
 import { ObstaclesManager, Obstacle } from './Obstacles';
+import { getQualityTier, QualityTier, WorldEnvironment } from './WorldEnvironment';
 
 // --- Assets & Constants ---
 const PLANE_SPEED = 0.5;
@@ -18,7 +19,7 @@ const Plane = ({ position, rotation, type }: { position: THREE.Vector3; rotation
 
   return (
     <group position={position} rotation={rotation}>
-      <group rotation={[0, Math.PI, 0]}> 
+      <group rotation={[0, Math.PI, 0]}>
           {/* Fuselage */}
           <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
             {isGlider ? (
@@ -86,7 +87,7 @@ const Rain = ({ count = 1000 }) => {
     const mesh = useRef<THREE.InstancedMesh>(null);
     const { camera } = useThree();
     const dummy = useMemo(() => new THREE.Object3D(), []);
-    
+
     const particles = useMemo(() => {
         const temp = [];
         for (let i = 0; i < count; i++) {
@@ -102,7 +103,7 @@ const Rain = ({ count = 1000 }) => {
 
     useFrame((state) => {
         if (!mesh.current) return;
-        
+
         particles.forEach((p, i) => {
             p.y -= p.velocity;
             if (p.y < -40) {
@@ -135,7 +136,7 @@ const Snow = ({ count = 1500 }) => {
     const mesh = useRef<THREE.InstancedMesh>(null);
     const { camera } = useThree();
     const dummy = useMemo(() => new THREE.Object3D(), []);
-    
+
     const particles = useMemo(() => {
         const temp = [];
         for (let i = 0; i < count; i++) {
@@ -154,7 +155,7 @@ const Snow = ({ count = 1500 }) => {
     useFrame((state) => {
         if (!mesh.current) return;
         const time = state.clock.elapsedTime;
-        
+
         particles.forEach((p, i) => {
             p.y -= p.velocity;
             if (p.y < -40) {
@@ -164,7 +165,7 @@ const Snow = ({ count = 1500 }) => {
             }
             // sway effect for snow
             const swayX = Math.sin(time * p.swaySpeed + p.swayOffset) * 0.5;
-            
+
             dummy.position.set(
                 camera.position.x + p.x + swayX,
                 camera.position.y + p.y,
@@ -188,7 +189,7 @@ const Snow = ({ count = 1500 }) => {
 // --- Flight Network Paths ---
 const FlightNetwork = ({ landmarks }: { landmarks: Landmark[] }) => {
     if (landmarks.length < 2) return null;
-    
+
     // Create a path through all landmarks (closed loop flight path)
     const points = landmarks.map(lm => new THREE.Vector3(lm.position[0], 9, lm.position[2]));
     points.push(new THREE.Vector3(landmarks[0].position[0], 9, landmarks[0].position[2]));
@@ -205,64 +206,6 @@ const FlightNetwork = ({ landmarks }: { landmarks: Landmark[] }) => {
             transparent
             opacity={0.8}
         />
-    );
-};
-
-// --- Dynamic Map Terrain ---
-const MapSurface = ({ region, weather }: { region: string, weather: Weather }) => {
-    // We only load displacement for mountains/valleys locally
-    const [displacement] = useLoader(THREE.TextureLoader, [
-        '/assets/earth-topology.png'
-    ]);
-    
-    // Determine Biome
-    const isDesert = ['Dubai', 'Egypt'].includes(region);
-    const isOcean = ['Pacific Ocean', 'Atlantic Ocean', 'Indian Ocean'].includes(region);
-    
-    // Load satellite texture based on biome
-    const getTextureUrl = () => {
-        if (weather === 'snowy') return '/assets/terrain_snow.jpg';
-        if (isDesert) return '/assets/terrain_desert.jpg';
-        if (isOcean) return '/assets/terrain_ocean.jpg';
-        return '/assets/terrain_forest.jpg'; // Default green forest/satellite
-    };
-
-    const satTexture = useLoader(THREE.TextureLoader, getTextureUrl());
-
-    useMemo(() => {
-        if (displacement) {
-            displacement.wrapS = displacement.wrapT = THREE.MirroredRepeatWrapping;
-            displacement.repeat.set(8, 8); // Scale up repeat so it doesn't look squished over a massive plane
-            displacement.needsUpdate = true;
-        }
-        if (satTexture) {
-            satTexture.wrapS = satTexture.wrapT = THREE.MirroredRepeatWrapping;
-            satTexture.repeat.set(24, 24); // Repeat to avoid blurriness over a large area
-            satTexture.colorSpace = THREE.SRGBColorSpace;
-            satTexture.needsUpdate = true;
-        }
-    }, [displacement, satTexture]);
-
-    return (
-        <group>
-            {/* Ground - Make it massively larger than the playable boundary to hide edges! */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]} receiveShadow>
-                <planeGeometry args={[4000, 4000, 256, 256]} />
-                <meshStandardMaterial 
-                    map={satTexture}
-                    displacementMap={displacement}
-                    displacementScale={isOcean ? 2 : 35} // Flat oceans, tall mountains
-                    roughness={weather === 'rainy' ? 0.3 : (isOcean ? 0.1 : 0.8)} 
-                    metalness={weather === 'rainy' ? 0.3 : (isOcean ? 0.8 : 0.05)} 
-                />
-            </mesh>
-            
-            {/* Base Ocean layer (water table) */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -8, 0]}>
-                <planeGeometry args={[4000, 4000]} />
-                <meshStandardMaterial color={weather === 'snowy' ? "#bae6fd" : "#0284c7"} roughness={0.1} metalness={0.8} />
-            </mesh>
-        </group>
     );
 };
 
@@ -358,12 +301,12 @@ const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: 
         {!landmark.collected && (
             <mesh ref={ringRef} castShadow position={[0, 8, 0]}>
                 <torusGeometry args={[12, 0.4, 16, 64]} />
-                <meshStandardMaterial 
-                    color={isTarget ? "#ef4444" : "#fcd34d"} 
-                    emissive={isTarget ? "#ef4444" : "#fcd34d"} 
-                    emissiveIntensity={1} 
-                    transparent 
-                    opacity={0.8} 
+                <meshStandardMaterial
+                    color={isTarget ? "#ef4444" : "#fcd34d"}
+                    emissive={isTarget ? "#ef4444" : "#fcd34d"}
+                    emissiveIntensity={1}
+                    transparent
+                    opacity={0.8}
                 />
             </mesh>
         )}
@@ -372,14 +315,14 @@ const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: 
         <Billboard follow={true}>
             <group ref={billboardRef}>
                 <mesh castShadow>
-                    <planeGeometry args={[16, 16]} /> 
+                    <planeGeometry args={[16, 16]} />
                     {texture ? (
                         <meshBasicMaterial map={texture} transparent opacity={landmark.collected ? 0.6 : 1} side={THREE.DoubleSide} />
                     ) : (
                          <meshStandardMaterial color={landmark.collected ? "#22c55e" : "#3b82f6"} />
                     )}
                 </mesh>
-                
+
                 {/* Frame/Border */}
                 <mesh position={[0, 0, -0.1]}>
                      <planeGeometry args={[17, 17]} />
@@ -388,8 +331,8 @@ const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: 
 
                 {/* Status Indicator Cone */}
                 {!landmark.collected && isTarget && (
-                    <mesh position={[0, 12, 0]}>
-                         <coneGeometry args={[1.5, 3, 8]} rotation={[Math.PI, 0, 0]} />
+                    <mesh position={[0, 12, 0]} rotation={[Math.PI, 0, 0]}>
+                         <coneGeometry args={[1.5, 3, 8]} />
                          <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={2} />
                     </mesh>
                 )}
@@ -415,7 +358,7 @@ const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: 
             <circleGeometry args={[6, 32]} />
             <meshBasicMaterial color="black" transparent opacity={0.3} />
         </mesh>
-        
+
         {/* Distance Light Beacon */}
         {!landmark.collected && isTarget && (
              <pointLight position={[0, 20, 0]} intensity={5} color="#ef4444" distance={100} decay={2} />
@@ -425,9 +368,9 @@ const LandmarkMarker: React.FC<{ landmark: Landmark; isTarget: boolean; region: 
 };
 
 // --- Game Logic Controller ---
-const GameController = ({ 
-    onUpdatePosition, 
-    onCheckCollisions, 
+const GameController = ({
+    onUpdatePosition,
+    onCheckCollisions,
     onCrash,
     isFlying,
     weather,
@@ -436,7 +379,7 @@ const GameController = ({
     controlsRef,
     planePosRef,
     obstaclesRef
-}: { 
+}: {
     onUpdatePosition: (pos: THREE.Vector3, rot: number) => void,
     onCheckCollisions: (pos: THREE.Vector3) => void,
     onCrash: (reason: string) => void,
@@ -449,14 +392,14 @@ const GameController = ({
     obstaclesRef: React.MutableRefObject<Obstacle[]>
 }) => {
     const { camera } = useThree();
-    const planePos = useRef(new THREE.Vector3(0, 30, 0)); 
+    const planePos = useRef(new THREE.Vector3(0, 30, 0));
     const planeRot = useRef(new THREE.Euler(0, 0, 0));
     const speed = useRef(PLANE_SPEED);
     const rotationSpeed = 0.03;
-    
+
     // Local keyboard state (fallback for desktop)
     const keys = useRef<{ [key: string]: boolean }>({});
-    
+
     const windOffset = useRef(new THREE.Vector2(0, 0));
 
     useEffect(() => {
@@ -477,13 +420,13 @@ const GameController = ({
         if (weather === 'stormy' || weather === 'rainy') {
             const time = state.clock.elapsedTime;
             const turbulenceAmount = weather === 'stormy' ? 0.008 : 0.002;
-            
+
             planeRot.current.z += (Math.random() - 0.5) * turbulenceAmount * 10;
             planeRot.current.x += (Math.random() - 0.5) * turbulenceAmount * 5;
-            
+
             windOffset.current.x = Math.sin(time * 0.5) * (weather === 'stormy' ? 0.1 : 0.02);
             windOffset.current.y = Math.cos(time * 0.3) * (weather === 'stormy' ? 0.1 : 0.02);
-            
+
             planePos.current.x += windOffset.current.x;
             planePos.current.z += windOffset.current.y;
         }
@@ -497,28 +440,28 @@ const GameController = ({
 
         if (isLeft) {
             planeRot.current.y += rotationSpeed;
-            targetBank = Math.PI / 4; 
+            targetBank = Math.PI / 4;
         } else if (isRight) {
             planeRot.current.y -= rotationSpeed;
-            targetBank = -Math.PI / 4; 
+            targetBank = -Math.PI / 4;
         }
-        
+
         planeRot.current.z = THREE.MathUtils.lerp(planeRot.current.z, targetBank, delta * 2);
 
         // Pitch & Speed
         let targetPitch = 0;
         if (isUp) {
              planePos.current.y += 0.2;
-             speed.current = PLANE_SPEED * 1.5; 
-             targetPitch = -Math.PI / 6; 
+             speed.current = PLANE_SPEED * 1.5;
+             targetPitch = -Math.PI / 6;
         } else if (isDown) {
              planePos.current.y -= 0.2;
              speed.current = PLANE_SPEED * 0.8;
-             targetPitch = Math.PI / 6; 
+             targetPitch = Math.PI / 6;
         } else {
              speed.current = PLANE_SPEED;
         }
-        
+
         planePos.current.y = Math.max(-5, Math.min(80, planePos.current.y));
         planeRot.current.x = THREE.MathUtils.lerp(planeRot.current.x, targetPitch, delta * 2);
 
@@ -537,7 +480,7 @@ const GameController = ({
         const cameraOffset = new THREE.Vector3(0, 10, 25).applyEuler(new THREE.Euler(0, planeRot.current.y, 0));
         const cameraTargetPos = planePos.current.clone().add(cameraOffset);
         camera.position.lerp(cameraTargetPos, 0.1);
-        
+
         const lookAtOffset = new THREE.Vector3(0, 0, -20).applyEuler(new THREE.Euler(0, planeRot.current.y, 0));
         camera.lookAt(planePos.current.clone().add(lookAtOffset));
 
@@ -550,7 +493,7 @@ const GameController = ({
 
         // 1. Check natural terrain crash
         // The terrain displacement goes up to y=35 on land and y=2 on ocean.
-        // We do a hard baseline collision. 
+        // We do a hard baseline collision.
         const isOcean = ['Pacific Ocean', 'Atlantic Ocean', 'Indian Ocean'].includes(region);
         const crashAltitude = isOcean ? 3 : 15;
         if (currentPos.y <= crashAltitude) {
@@ -594,27 +537,28 @@ interface Game3DProps {
 }
 
 export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateStats, onCrash, region, weather, planeType, controlsRef, planePosRef, isPaused }) => {
-    
+
     const isStorm = weather === 'stormy';
     const isRain = weather === 'rainy';
     const isClear = weather === 'sunny';
 
     const obstaclesRef = useRef<Obstacle[]>([]);
+    const [quality] = useState<QualityTier>(() => getQualityTier());
 
     const fogColor = isStorm ? '#0f172a' : (isRain ? '#475569' : '#bae6fd');
     const fogNear = isStorm ? 50 : (isRain ? 100 : 200);
-    const fogFar = isStorm ? 400 : (isRain ? 600 : 1500); 
-    
+    const fogFar = isStorm ? 400 : (isRain ? 600 : 1500);
+
     const sunPos = isClear ? new THREE.Vector3(100, 40, 100) : new THREE.Vector3(100, 5, -100);
 
     const handleUpdatePosition = (pos: THREE.Vector3, rotY: number) => {
         const deg = (rotY * 180 / Math.PI) % 360;
-        let compassDeg = deg; 
+        let compassDeg = deg;
         if (compassDeg < 0) compassDeg += 360;
-        
+
         let dir: Direction = 'N';
         if (compassDeg >= 337.5 || compassDeg < 22.5) dir = 'N';
-        else if (compassDeg >= 22.5 && compassDeg < 67.5) dir = 'NW'; 
+        else if (compassDeg >= 22.5 && compassDeg < 67.5) dir = 'NW';
         else if (compassDeg >= 67.5 && compassDeg < 112.5) dir = 'W';
         else if (compassDeg >= 112.5 && compassDeg < 157.5) dir = 'SW';
         else if (compassDeg >= 157.5 && compassDeg < 202.5) dir = 'S';
@@ -631,8 +575,8 @@ export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateSt
             const lmPos = new THREE.Vector3(...lm.position);
             const dist2D = new THREE.Vector2(pos.x, pos.z).distanceTo(new THREE.Vector2(lmPos.x, lmPos.z));
             const heightDiff = Math.abs(pos.y - lmPos.y);
-            
-            if (dist2D < 12 && heightDiff < 25) { 
+
+            if (dist2D < 12 && heightDiff < 25) {
                 onCollect(lm.id);
             }
         });
@@ -641,35 +585,34 @@ export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateSt
     const nextTarget = landmarks.find(l => !l.collected);
 
     return (
-        <Canvas shadows camera={{ fov: 60, far: 2000 }}>
+        <Canvas shadows={quality !== 'low'} dpr={quality === 'high' ? [1, 2] : [1, 1.5]} gl={{ antialias: quality !== 'low', powerPreference: 'high-performance' }} camera={{ fov: 60, far: quality === 'low' ? 1100 : 1600 }}>
             <color attach="background" args={[fogColor]} />
             <fog attach="fog" args={[fogColor, fogNear, fogFar]} />
-            
+
             {!isStorm && <Sky sunPosition={sunPos} turbidity={isRain ? 8 : 0.5} rayleigh={isRain ? 0.2 : 0.5} mieCoefficient={0.005} mieDirectionalG={0.8} />}
-            {isClear && <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />}
-            
+
             <ambientLight intensity={isStorm ? 0.2 : (isRain ? 0.5 : 0.8)} />
-            <directionalLight 
-                position={[100, 100, 50]} 
-                intensity={isStorm ? 0.1 : (isRain ? 0.5 : 1.5)} 
-                castShadow 
-                shadow-mapSize={[1024, 1024]} 
+            <directionalLight
+                position={[100, 100, 50]}
+                intensity={isStorm ? 0.1 : (isRain ? 0.5 : 1.5)}
+                castShadow
+                shadow-mapSize={[quality === 'high' ? 1024 : 512, quality === 'high' ? 1024 : 512]}
             />
-            
+
             {isStorm && (
                  <pointLight position={[0, 100, 0]} intensity={Math.random() > 0.95 ? 20 : 0} color="white" distance={600} />
             )}
-            
-            {(isRain || isStorm) && <Rain count={isStorm ? 3000 : 1500} />}
-            {weather === 'snowy' && <Snow count={2000} />}
 
-            <MapSurface region={region} weather={weather} />
+            {(isRain || isStorm) && <Rain count={quality === 'low' ? 500 : (isStorm ? 2200 : 1100)} />}
+            {weather === 'snowy' && <Snow count={quality === 'low' ? 600 : 1500} />}
+
+            <WorldEnvironment region={region} weather={weather} quality={quality} />
             <FlightNetwork landmarks={landmarks} />
-            
+
             <ObstaclesManager region={region} obstaclesRef={obstaclesRef} />
 
-            <GameController 
-                onUpdatePosition={handleUpdatePosition} 
+            <GameController
+                onUpdatePosition={handleUpdatePosition}
                 onCheckCollisions={handleCheckCollisions}
                 onCrash={onCrash}
                 isFlying={!isPaused}
@@ -682,9 +625,9 @@ export const Game3D: React.FC<Game3DProps> = ({ landmarks, onCollect, onUpdateSt
             />
 
             {landmarks.map(lm => (
-                <LandmarkMarker 
-                    key={lm.id} 
-                    landmark={lm} 
+                <LandmarkMarker
+                    key={lm.id}
+                    landmark={lm}
                     isTarget={nextTarget?.id === lm.id}
                     region={region}
                 />
