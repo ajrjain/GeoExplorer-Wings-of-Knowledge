@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Game3D } from './components/Game3D';
-import { EarthIntro } from './components/EarthIntro';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { UIOverlay } from './components/UIOverlay';
 import { GameState, Direction, Landmark, Weather, ControlState, DialogMessage } from './types';
 import { fetchLandmarksForRegion, GeminiLiveClient, RegionData } from './services/geminiService';
 import { DialogueSystem } from './components/DialogueManager';
+
+// Keep the landing and region picker fast; WebGL is only needed once a flight starts.
+const Game3D = React.lazy(() => import('./components/Game3D').then(module => ({ default: module.Game3D })));
+const EarthIntro = React.lazy(() => import('./components/EarthIntro').then(module => ({ default: module.EarthIntro })));
 
 const MOCK_LANDMARKS: Omit<Landmark, 'position' | 'collected'>[] = [
     { id: 'm1', name: 'Central Plaza', description: 'The heart of the city.', fact: 'People gather here for celebrations.' },
@@ -59,7 +61,7 @@ export default function App() {
   const liveClientRef = useRef<GeminiLiveClient | null>(null);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const dialogTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Shared state for controls (Keyboard + Touch)
   const controlsRef = useRef<ControlState>({
       up: false,
@@ -74,7 +76,7 @@ export default function App() {
     const dialog = DialogueSystem.getRandomDialogue(category);
     setActiveDialog(dialog);
     DialogueSystem.speak(dialog.text);
-    
+
     if (dialogTimerRef.current) clearTimeout(dialogTimerRef.current);
     dialogTimerRef.current = setTimeout(() => {
         setActiveDialog(null);
@@ -84,7 +86,7 @@ export default function App() {
   // Random ambient chatter effect
   useEffect(() => {
     if (gameState.screen !== 'playing' || gameState.isPaused) return;
-    
+
     const interval = setInterval(() => {
         if (Math.random() > 0.5 && !activeDialog) { // 50% chance every 20s if no active dialog
             triggerDialog('ambient');
@@ -108,7 +110,7 @@ export default function App() {
           const utterance = new SpeechSynthesisUtterance(introText);
           utterance.rate = 1.1;
           utterance.pitch = 1.2; // Cheerful pilot voice
-          
+
           // Try to find a good English voice
           const voices = window.speechSynthesis.getVoices();
           const preferredVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Samantha'));
@@ -137,7 +139,7 @@ export default function App() {
         setGameState(prev => ({ ...prev, screen: 'waitlist' as any }));
         return;
     }
-    
+
     // Unlock Audio Contexts
     try {
         DialogueSystem.playRadioBeep();
@@ -168,9 +170,9 @@ export default function App() {
              data = await fetchLandmarksForRegion(region);
         } catch (err) {
             console.warn("API fetch failed, using mock data", err);
-            data = { 
-                landmarks: MOCK_LANDMARKS, 
-                introText: `Welcome to ${region}! I'm Captain Echo. Let's explore!` 
+            data = {
+                landmarks: MOCK_LANDMARKS,
+                introText: `Welcome to ${region}! I'm Captain Echo. Let's explore!`
             };
         }
 
@@ -186,7 +188,7 @@ export default function App() {
             const radius = 80 + Math.random() * 100;
             const x = Math.cos(angle) * radius;
             const z = Math.sin(angle) * radius;
-            
+
             return {
                 ...lm,
                 position: [x, 20 + Math.random() * 20, z],
@@ -233,7 +235,7 @@ export default function App() {
     } else {
         try {
             await liveClientRef.current.connect({
-                onAudioData: () => {}, 
+                onAudioData: () => {},
                 onTranscription: (text, isUser) => {
                     if (isUser) setLastTranscription(text);
                 },
@@ -254,7 +256,7 @@ export default function App() {
 
         const newLandmarks = [...prev.landmarks];
         newLandmarks[lmIndex] = { ...newLandmarks[lmIndex], collected: true };
-        
+
         // Count collected landmarks for win condition instead of using raw score
         const collectedCount = newLandmarks.filter(l => l.collected).length;
         const newScore = prev.score + 100;
@@ -267,7 +269,7 @@ export default function App() {
             setTimeout(() => {
                 setGameState(gs => ({ ...gs, screen: 'summary', score: gs.score + 500 })); // Add completion bonus
                 setCurrentFact(null);
-            }, 6000); 
+            }, 6000);
         }
 
         return {
@@ -312,7 +314,7 @@ export default function App() {
 
   const handleCrash = useCallback((reason: string) => {
       setGameState(prev => ({ ...prev, screen: 'gameover', isPaused: true }));
-      setIntroText(reason); 
+      setIntroText(reason);
       triggerDialog('crash');
   }, [triggerDialog]);
 
@@ -330,15 +332,17 @@ export default function App() {
 
   return (
     <div className="w-full h-[100dvh] relative bg-slate-900 overflow-hidden">
-      
+
       {/* 3D Layers */}
       {gameState.screen === 'intro' && (
           <div className="absolute inset-0 z-10 transition-opacity duration-1000">
-              <EarthIntro 
-                  targetLat={selectedCoords.lat} 
-                  targetLon={selectedCoords.lon} 
-                  onComplete={handleIntroAnimationComplete} 
-              />
+              <Suspense fallback={<div className="h-full bg-slate-950" />}>
+                <EarthIntro
+                    targetLat={selectedCoords.lat}
+                    targetLon={selectedCoords.lon}
+                    onComplete={handleIntroAnimationComplete}
+                />
+              </Suspense>
               <div className="absolute bottom-10 left-0 right-0 text-center pointer-events-none">
                   <div className="inline-block bg-black/60 backdrop-blur px-8 py-4 rounded-full border border-sky-500/50">
                       <p className="text-sky-300 text-xl font-mono animate-pulse">
@@ -352,23 +356,25 @@ export default function App() {
       {/* 3D Layers - Render Game3D underneath during intro so it loads textures early */}
       {(gameState.screen === 'intro' || gameState.screen === 'playing' || gameState.screen === 'summary' || gameState.screen === 'gameover') && (
           <div className={`absolute inset-0 z-0 transition-opacity duration-1000 ${['playing', 'summary', 'gameover'].includes(gameState.screen) ? 'opacity-100' : 'opacity-0'}`}>
-             <Game3D 
-                landmarks={gameState.landmarks} 
-                onCollect={handleCollect}
-                onUpdateStats={handleUpdateStats}
-                onCrash={handleCrash}
-                region={gameState.selectedRegion}
-                weather={currentWeather}
-                planeType={gameState.selectedPlane}
-                controlsRef={controlsRef}
-                planePosRef={planePosRef}
-                isPaused={gameState.isPaused || gameState.screen !== 'playing'}
-             />
+             <Suspense fallback={<div className="h-full bg-slate-950" />}>
+               <Game3D
+                  landmarks={gameState.landmarks}
+                  onCollect={handleCollect}
+                  onUpdateStats={handleUpdateStats}
+                  onCrash={handleCrash}
+                  region={gameState.selectedRegion}
+                  weather={currentWeather}
+                  planeType={gameState.selectedPlane}
+                  controlsRef={controlsRef}
+                  planePosRef={planePosRef}
+                  isPaused={gameState.isPaused || gameState.screen !== 'playing'}
+               />
+             </Suspense>
           </div>
       )}
 
       {/* UI Layer */}
-      <UIOverlay 
+      <UIOverlay
         gameState={gameState}
         currentDirection={currentDirection}
         copilotConnected={copilotConnected}
